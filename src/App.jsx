@@ -171,11 +171,14 @@ export default function App() {
 
         const depthRatio = drop.sprite.y / app.screen.height; 
         
-        drop.blur.blur = Math.max(0, (depthRatio - 0.25) * 6);
-
         // 文字淡出消失 (70% 開始)
         const fadeStart = 0.70; 
         const fadeEnd = 0.90;   
+
+        // 40% 開始模糊，並在文字完全消失的界線 (fadeEnd) 停止增加模糊度
+        const blurDepth = Math.min(depthRatio, fadeEnd);
+        drop.blur.blur = Math.max(0, (blurDepth - 0.40) * 10);
+
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
