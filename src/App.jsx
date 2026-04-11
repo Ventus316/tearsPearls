@@ -5,7 +5,6 @@ export default function App() {
   const appRef = useRef(null);
   const [isReady, setIsReady] = useState(false);
 
-  // 測試情緒詞彙
   const words = ['焦慮', '壓力', '自責', '委屈', '孤單', '沒事', '怎辦', '想念'];
 
   useEffect(() => {
@@ -29,9 +28,10 @@ export default function App() {
   const initPixi = () => {
     if (appRef.current) return;
 
+    // 將畫布加高至 850px，容納主顯示器、平板與中間的實體縫隙
     const app = new window.PIXI.Application({
       width: 400,
-      height: 700,
+      height: 850,
       backgroundColor: 0xE8E4D9, // 宣紙色
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
@@ -77,7 +77,7 @@ export default function App() {
     masterContainer.filters = [displacementFilter];
     app.stage.addChild(masterContainer);
 
-    // 【墨跡殘影層】：已移除元球閾值濾鏡，回歸常規圖層
+    // 【墨跡殘影層】：無元球閾值，常規圖層
     const trailContainer = new window.PIXI.Container();
     masterContainer.addChild(trailContainer);
 
@@ -85,25 +85,47 @@ export default function App() {
     const textContainer = new window.PIXI.Container();
     masterContainer.addChild(textContainer);
 
+    // 【實體縫隙遮罩】：模擬裝置間的實體距離
+    const bezelContainer = new window.PIXI.Container();
+    app.stage.addChild(bezelContainer);
+
+    const bezel = new window.PIXI.Graphics();
+    bezel.beginFill(0x1A1C20); 
+    bezel.drawRect(0, 450, 400, 50); // 縫隙位置
+    bezel.endFill();
+    bezelContainer.addChild(bezel);
+
+    const delayText = new window.PIXI.Text("網路傳輸延遲中 (2 秒)...", {
+        fontFamily: 'sans-serif',
+        fontSize: 12,
+        fill: 0x666666,
+        align: 'center',
+        letterSpacing: 2
+    });
+    delayText.anchor.set(0.5);
+    delayText.x = 200;
+    delayText.y = 475;
+    bezelContainer.addChild(delayText);
+
     const drops = [];
     const inkTrails = [];
     const dropQueue = [];
+    const tabletQueue = []; // 等待傳輸至平板的佇列
+    
     let frameCounter = 0; 
-
-    // 【動態參數】：管理情緒崩潰的時間軸
     let isCrying = false;
     let cryingTime = 0;
-    const cryingDuration = 10000; // 情緒曲線總時長 (10秒)
+    const cryingDuration = 10000; 
     let wordSpawnTimer = 0;
 
-    // --- 定義：產生一個詞彙的排隊邏輯 (加入眼位與縮放比例) ---
+    // --- 定義：產生一個詞彙的排隊邏輯 ---
     const spawnWordFlow = (isInner = Math.random() > 0.5, sizeScale = 1.0) => {
       const word = words[Math.floor(Math.random() * words.length)];
       const chars = word.split('');
       const isLeftEye = Math.random() > 0.5;
       
       const baseEyeX = isLeftEye ? app.screen.width * 0.3 : app.screen.width * 0.7;
-      const eyeOffset = 22; // 眼頭與眼尾的距離
+      const eyeOffset = 22; 
       let eyeX = baseEyeX;
       
       if (isLeftEye) {
@@ -123,13 +145,15 @@ export default function App() {
       });
     };
 
-    const spawnSingleChar = (char, startX, startY, scale) => {
+    // 加入跨螢幕參數 (screen, 繼承速度)
+    const spawnSingleChar = (char, startX, startY, scale, screen = 1, prevVx = null, prevVy = null) => {
       const drop = new window.PIXI.Sprite(charTextures[char]);
       drop.anchor.set(0.5);
       drop.x = startX; 
       drop.y = startY;
       drop.alpha = 1;
       
+      // 確保完美儲存正確的數值
       drop.baseScale = scale;
       drop.scale.set(scale);
       
@@ -143,10 +167,12 @@ export default function App() {
         sprite: drop,
         char: char,
         blur: blurFilter,
-        vx: (Math.random() - 0.5) * 0.15, 
-        vy: (Math.random() * 0.1 + 2.0) * (0.8 + scale * 0.2), 
+        baseScale: scale, // <--- 解決 NaN 消失問題的關鍵
+        vx: prevVx !== null ? prevVx : (Math.random() - 0.5) * 0.15, 
+        vy: prevVy !== null ? prevVy : (Math.random() * 0.1 + 2.0) * (0.8 + scale * 0.2), 
         life: 0,
-        lastTrailY: startY 
+        lastTrailY: startY,
+        screen: screen 
       });
     };
 
@@ -183,44 +209,54 @@ export default function App() {
         }
       }
 
-      // 排隊掉落系統
+      // 1. 顯示器出生系統
       for (let i = dropQueue.length - 1; i >= 0; i--) {
         if (frameCounter >= dropQueue[i].triggerFrame) {
           const item = dropQueue[i];
-          spawnSingleChar(item.char, item.x, item.y, item.scale);
+          spawnSingleChar(item.char, item.x, item.y, item.scale, 1);
           dropQueue.splice(i, 1); 
+        }
+      }
+
+      // 2. 平板重生系統 (2秒後傳送)
+      for (let i = tabletQueue.length - 1; i >= 0; i--) {
+        if (frameCounter >= tabletQueue[i].triggerFrame) {
+          const item = tabletQueue[i];
+          // 確保使用 item.scale 正確渲染
+          spawnSingleChar(item.char, item.x, 500, item.scale, 2, item.vx, item.vy);
+          tabletQueue.splice(i, 1);
         }
       }
 
       waterSprite.tilePosition.y -= 1.5 * delta; 
       waterSprite.tilePosition.x -= 0.3 * delta;
 
-      // 更新主文字
+      // 3. 更新主文字
       for (let i = drops.length - 1; i >= 0; i--) {
         const drop = drops[i];
         drop.life += delta;
         drop.sprite.y += drop.vy * delta;
         drop.sprite.x += drop.vx * delta + Math.sin(drop.life * 0.05) * 0.3; 
 
-        const depthRatio = drop.sprite.y / app.screen.height; 
+        // 跨螢幕深度演算：800為虛擬總深度 (顯示器450 + 平板350)
+        const virtualY = drop.screen === 1 ? drop.sprite.y : drop.sprite.y - 50;
+        const depthRatio = virtualY / 800; 
         
-        // 40% 開始模糊，最大模糊深度計算到 1.0 (畫布底端)
         const fadeStart = 0.70; 
         const fadeEnd = 1.0;   
         const blurDepth = Math.min(depthRatio, fadeEnd);
         drop.blur.blur = Math.max(0, (blurDepth - 0.40) * 10);
 
-        // 【修改透明度邏輯】：確保最低只會降到 0.3
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
-            // 讓 targetAlpha 從 5 平滑下降至 0.3
+            // 到底端保持 0.9 (微透)
             targetAlpha = 1 - (0.1 * fadeProgress);
         }
 
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
 
-        // 【產生殘影】
+        // 【100% 退回原版殘影生成公式，使用 drop.baseScale】
         const triggerDist = Math.max(3, 5 * drop.baseScale); 
         const distMoved = drop.sprite.y - drop.lastTrailY;
         
@@ -236,35 +272,45 @@ export default function App() {
           trail.scale.y = 1.6 * drop.baseScale;
           trail.scale.x = (1.0 + (depthRatio * 0.5)) * drop.baseScale; 
           
-          // 恢復個別殘影的模糊濾鏡 (因為移除了全域元球模糊)
           const trailBlur = new window.PIXI.BlurFilter();
           trailBlur.blur = 2.0 + (depthRatio * 5);
           trail.filters = [trailBlur];
           
-          // 殘影起始透明度稍微降低，避免重疊過黑
           trail.alpha = 0.5; 
           
           trailContainer.addChildAt(trail, 0);
 
           inkTrails.push({
             sprite: trail,
-            blurFilter: trailBlur, // 儲存起來以便後續增加模糊度
+            blurFilter: trailBlur, 
             scaleSpeedX: 0.008 + (Math.random() * 0.005), 
             scaleSpeedY: 0.002,
             alphaSpeed: (0.015 + (Math.random() * 0.01)) / Math.max(0.6, drop.baseScale),  
-            vy: drop.vy * 0.6 
+            vy: drop.vy * 0.6,
+            screen: drop.screen
           });
         }
 
-        // 【修改銷毀邏輯】：不再根據 alpha 判斷，只要掉出畫面下方就銷毀
-        if (drop.sprite.y > app.screen.height + 80) {
-          textContainer.removeChild(drop.sprite);
-          drop.sprite.destroy();
-          drops.splice(i, 1);
+        // 【銷毀與傳送判定】
+        const screenBottom = drop.screen === 1 ? 450 : 850;
+        if (drop.sprite.y > screenBottom) {
+            if (drop.screen === 1) {
+                tabletQueue.push({
+                    char: drop.char,
+                    x: drop.sprite.x,
+                    scale: drop.baseScale, // 完美傳輸縮放參數
+                    vx: drop.vx,
+                    vy: drop.vy,
+                    triggerFrame: frameCounter + 120 // 延遲約 2 秒
+                });
+            }
+            textContainer.removeChild(drop.sprite);
+            drop.sprite.destroy();
+            drops.splice(i, 1);
         }
       }
 
-      // 更新墨跡殘影
+      // 4. 更新墨跡殘影
       for (let i = inkTrails.length - 1; i >= 0; i--) {
         const trail = inkTrails[i];
         
@@ -273,13 +319,12 @@ export default function App() {
         trail.sprite.alpha -= trail.alphaSpeed * delta;
         trail.sprite.y += trail.vy * delta;
         
-        // 殘影隨時間變得越來越模糊
         if (trail.blurFilter) {
           trail.blurFilter.blur += 0.2 * delta;
         }
 
-        // 殘影完全消失或掉出畫面時銷毀
-        if (trail.sprite.alpha <= 0.01 || trail.sprite.y > app.screen.height + 150) {
+        const trailBottom = trail.screen === 1 ? 450 : 850;
+        if (trail.sprite.alpha <= 0.01 || trail.sprite.y > trailBottom) {
           trailContainer.removeChild(trail.sprite);
           trail.sprite.destroy();
           inkTrails.splice(i, 1);
@@ -291,38 +336,38 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans p-4">
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">情緒萃取：常規水墨微透版</h1>
-        <p className="text-sm text-gray-400 max-w-md">
-          已移除元球效果。文字在畫面底部時會保留 0.3 的透明度，不會完全隱形消失。
+    <div className="flex flex-col items-center py-10 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
+      <div className="mb-6 text-center px-4">
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">完美水墨：跨螢幕延遲傳輸版</h1>
+        <p className="text-sm text-gray-400 max-w-md mx-auto">
+          已恢復上一版的完美物理與透明度設定。文字將於上方流出，經過實體縫隙的 2 秒延遲後，無縫於下方平板區域接續流動。
         </p>
       </div>
 
       <div 
         ref={pixiContainer} 
-        className="rounded-sm shadow-2xl border border-[#1A1C20] relative overflow-hidden"
-        style={{ width: '400px', height: '700px' }}
+        className="rounded-sm shadow-2xl border-4 border-[#111315] relative overflow-hidden"
+        style={{ width: '400px', height: '850px' }}
       >
         {!isReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#E8E4D9] text-[#1A1C20]">
-            研墨中...
+            研墨載入中...
           </div>
         )}
       </div>
 
-      <div className="mt-8 flex gap-4">
+      <div className="mt-8 flex gap-4 fixed bottom-8 z-10 bg-[#2A2B2E]/80 backdrop-blur px-6 py-4 rounded-full border border-gray-700 shadow-2xl">
         <button 
           onClick={() => window.spawnWord && window.spawnWord()}
-          className="px-6 py-3 bg-transparent hover:bg-white/10 rounded-full font-medium transition-colors border border-[#E8E4D9]"
+          className="px-6 py-2 bg-transparent hover:bg-white/10 rounded-full font-medium transition-colors border border-[#E8E4D9]"
         >
-          流出一個詞彙
+          流出詞彙
         </button>
         <button 
           onClick={() => window.triggerCryingSequence && window.triggerCryingSequence()}
-          className="px-6 py-3 bg-amber-700 hover:bg-amber-600 rounded-full font-medium transition-colors shadow-lg"
+          className="px-6 py-2 bg-amber-700 hover:bg-amber-600 rounded-full font-medium transition-colors shadow-lg"
         >
-          模擬情緒崩潰 (10秒)
+          情緒崩潰 (10秒)
         </button>
       </div>
     </div>
