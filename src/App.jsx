@@ -7,6 +7,20 @@ export default function App() {
 
   const words = ['焦慮', '壓力', '自責', '委屈', '孤單', '沒事', '怎辦', '想念'];
 
+  // ==========================================
+  // 💡 【顯示器與設備尺寸設定區】 💡
+  // 你可以在這裡自由調整這三個數值
+  // ==========================================
+  const MONITOR_H = 450; // 主顯示器高度
+  const GAP_H = 50;      // 實體縫隙高度 (黑條)
+  const TABLET_H = 350;  // 平板區域高度
+
+  // --- 自動計算的衍生常數 (請勿修改) ---
+  const TOTAL_H = MONITOR_H + GAP_H + TABLET_H; // 畫布總高度
+  const TABLET_START_Y = MONITOR_H + GAP_H;     // 平板區的起始 Y 座標
+  const VIRTUAL_H = MONITOR_H + TABLET_H;       // 扣除縫隙的物理總深度 (用於計算透明度與模糊)
+  // ==========================================
+
   useEffect(() => {
     if (window.PIXI) {
       initPixi();
@@ -28,11 +42,11 @@ export default function App() {
   const initPixi = () => {
     if (appRef.current) return;
 
-    // 將畫布加高至 850px，容納主顯示器、平板與中間的實體縫隙
+    // 將畫布高度設為常數 TOTAL_H
     const app = new window.PIXI.Application({
       width: 400,
-      height: 850,
-      backgroundColor: 0xE8E4D9, // 宣紙色
+      height: TOTAL_H, 
+      backgroundColor: 0xE8E4D9, 
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
     });
@@ -40,7 +54,6 @@ export default function App() {
     pixiContainer.current.appendChild(app.view);
     appRef.current = app;
 
-    // --- 效能優化：把所有「單字」預先算成圖片 ---
     const uniqueChars = new Set(words.join('').split(''));
     const charTextures = {};
     
@@ -55,7 +68,6 @@ export default function App() {
       textGraphic.destroy();
     });
 
-    // --- 背景水波 ---
     const svgNoise = `
       <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
         <filter id="noise">
@@ -70,28 +82,25 @@ export default function App() {
     const waterSprite = new window.PIXI.TilingSprite(noiseTexture, app.screen.width, app.screen.height);
     app.stage.addChild(waterSprite);
 
-    // 【主圖層】：統一掌管水流扭曲
     const masterContainer = new window.PIXI.Container();
     const displacementFilter = new window.PIXI.DisplacementFilter(waterSprite);
     displacementFilter.scale.set(12);
     masterContainer.filters = [displacementFilter];
     app.stage.addChild(masterContainer);
 
-    // 【墨跡殘影層】：無元球閾值，常規圖層
     const trailContainer = new window.PIXI.Container();
     masterContainer.addChild(trailContainer);
 
-    // 【主體文字層】
     const textContainer = new window.PIXI.Container();
     masterContainer.addChild(textContainer);
 
-    // 【實體縫隙遮罩】：模擬裝置間的實體距離，覆蓋在最上層
+    // 【實體縫隙遮罩】：使用常數設定位置與高度
     const bezelContainer = new window.PIXI.Container();
     app.stage.addChild(bezelContainer);
 
     const bezel = new window.PIXI.Graphics();
     bezel.beginFill(0x1A1C20); 
-    bezel.drawRect(0, 450, 400, 50); // 縫隙位置
+    bezel.drawRect(0, MONITOR_H, 400, GAP_H); 
     bezel.endFill();
     bezelContainer.addChild(bezel);
 
@@ -104,13 +113,13 @@ export default function App() {
     });
     delayText.anchor.set(0.5);
     delayText.x = 200;
-    delayText.y = 475;
+    delayText.y = MONITOR_H + (GAP_H / 2); // 置中於縫隙
     bezelContainer.addChild(delayText);
 
     const drops = [];
     const inkTrails = [];
     const dropQueue = [];
-    const tabletQueue = []; // 等待傳輸至平板的佇列
+    const tabletQueue = []; 
     
     let frameCounter = 0; 
     let isCrying = false;
@@ -118,7 +127,6 @@ export default function App() {
     const cryingDuration = 10000; 
     let wordSpawnTimer = 0;
 
-    // --- 定義：產生一個詞彙的排隊邏輯 ---
     const spawnWordFlow = (isInner = Math.random() > 0.5, sizeScale = 1.0) => {
       const word = words[Math.floor(Math.random() * words.length)];
       const chars = word.split('');
@@ -145,14 +153,13 @@ export default function App() {
       });
     };
 
-    // 加入跨螢幕參數 (screen, 繼承速度)
     const spawnSingleChar = (char, startX, startY, scale, screen = 1, prevVx = null, prevVy = null) => {
       const drop = new window.PIXI.Sprite(charTextures[char]);
       drop.anchor.set(0.5);
       drop.x = startX; 
       drop.y = startY;
       drop.alpha = 1;
-
+      
       drop.baseScale = scale;
       drop.scale.set(scale);
       
@@ -162,12 +169,11 @@ export default function App() {
 
       textContainer.addChild(drop);
 
-      // 【核心修復】：確實將 baseScale 存入資料庫，供物理引擎與平板傳輸讀取
       drops.push({
         sprite: drop,
         char: char,
         blur: blurFilter,
-        baseScale: scale, // <--- 解決 NaN 消失問題的關鍵
+        baseScale: scale, 
         vx: prevVx !== null ? prevVx : (Math.random() - 0.5) * 0.15, 
         vy: prevVy !== null ? prevVy : (Math.random() * 0.1 + 2.0) * (0.8 + scale * 0.2), 
         life: 0,
@@ -185,7 +191,6 @@ export default function App() {
       wordSpawnTimer = 0;
     };
 
-    // --- 動畫循環 ---
     app.ticker.add((delta) => {
       frameCounter += delta;
 
@@ -209,7 +214,6 @@ export default function App() {
         }
       }
 
-      // 1. 顯示器出生系統
       for (let i = dropQueue.length - 1; i >= 0; i--) {
         if (frameCounter >= dropQueue[i].triggerFrame) {
           const item = dropQueue[i];
@@ -218,12 +222,11 @@ export default function App() {
         }
       }
 
-      // 2. 平板重生系統 (2秒後傳送)
       for (let i = tabletQueue.length - 1; i >= 0; i--) {
         if (frameCounter >= tabletQueue[i].triggerFrame) {
           const item = tabletQueue[i];
-          // 在 Y=500 平板頂端重生
-          spawnSingleChar(item.char, item.x, 500, item.scale, 2, item.vx, item.vy);
+          // 【使用常數】：在平板區域起點重生
+          spawnSingleChar(item.char, item.x, TABLET_START_Y, item.scale, 2, item.vx, item.vy);
           tabletQueue.splice(i, 1);
         }
       }
@@ -231,16 +234,15 @@ export default function App() {
       waterSprite.tilePosition.y -= 1.5 * delta; 
       waterSprite.tilePosition.x -= 0.3 * delta;
 
-      // 3. 更新主文字
       for (let i = drops.length - 1; i >= 0; i--) {
         const drop = drops[i];
         drop.life += delta;
         drop.sprite.y += drop.vy * delta;
         drop.sprite.x += drop.vx * delta + Math.sin(drop.life * 0.05) * 0.3; 
 
-        // 跨螢幕深度演算：800為虛擬總深度 (顯示器450 + 平板350)
-        const virtualY = drop.screen === 1 ? drop.sprite.y : drop.sprite.y - 50;
-        const depthRatio = virtualY / 800; 
+        // 【使用常數】：跨螢幕深度演算
+        const virtualY = drop.screen === 1 ? drop.sprite.y : drop.sprite.y - GAP_H;
+        const depthRatio = virtualY / VIRTUAL_H; 
         
         const fadeStart = 0.70; 
         const fadeEnd = 1.0;   
@@ -250,17 +252,15 @@ export default function App() {
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
-            // 最低透明度維持 0.9 
             targetAlpha = 1 - (0.1 * fadeProgress);
         }
 
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
 
-        // 【恢復正常的水墨殘影】
         const triggerDist = Math.max(3, 5 * drop.baseScale); 
         const distMoved = drop.sprite.y - drop.lastTrailY;
         
-        if (distMoved >= triggerDist) {
+        if (distMoved >= triggerDist && depthRatio > 0.2) {
           drop.lastTrailY = drop.sprite.y;
           
           const trail = new window.PIXI.Sprite(charTextures[drop.char]);
@@ -273,10 +273,10 @@ export default function App() {
           trail.scale.x = (1.0 + (depthRatio * 0.5)) * drop.baseScale; 
           
           const trailBlur = new window.PIXI.BlurFilter();
-          trailBlur.blur = 2.0 + (depthRatio * 5);
+          trailBlur.blur = depthRatio * 8; 
           trail.filters = [trailBlur];
           
-          trail.alpha = 0.5; 
+          trail.alpha = 0.1 + (depthRatio * 0.4); 
           
           trailContainer.addChildAt(trail, 0);
 
@@ -291,18 +291,17 @@ export default function App() {
           });
         }
 
-        // 【銷毀與傳送判定】
-        const screenBottom = drop.screen === 1 ? 450 : 850;
+        // 【使用常數】：銷毀與傳送判定
+        const screenBottom = drop.screen === 1 ? MONITOR_H : TOTAL_H;
         if (drop.sprite.y > screenBottom) {
             if (drop.screen === 1) {
-                // 傳遞所有完美保留的數值給平板
                 tabletQueue.push({
                     char: drop.char,
                     x: drop.sprite.x,
                     scale: drop.baseScale, 
                     vx: drop.vx,
                     vy: drop.vy,
-                    triggerFrame: frameCounter + 120 // 延遲約 2 秒
+                    triggerFrame: frameCounter + 120 
                 });
             }
             textContainer.removeChild(drop.sprite);
@@ -311,7 +310,6 @@ export default function App() {
         }
       }
 
-      // 4. 更新墨跡殘影
       for (let i = inkTrails.length - 1; i >= 0; i--) {
         const trail = inkTrails[i];
         
@@ -324,7 +322,8 @@ export default function App() {
           trail.blurFilter.blur += 0.2 * delta;
         }
 
-        const trailBottom = trail.screen === 1 ? 450 : 850;
+        // 【使用常數】：殘影銷毀判定
+        const trailBottom = trail.screen === 1 ? MONITOR_H : TOTAL_H;
         if (trail.sprite.alpha <= 0.01 || trail.sprite.y > trailBottom) {
           trailContainer.removeChild(trail.sprite);
           trail.sprite.destroy();
@@ -339,16 +338,17 @@ export default function App() {
   return (
     <div className="flex flex-col items-center py-10 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
       <div className="mb-6 text-center px-4">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">完美水墨：跨螢幕延遲傳輸版</h1>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">完美水墨：可調式跨螢幕版</h1>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          已徹底解決平板傳輸問題！不僅會如期在平板重生，連帶顯示器失去的水墨殘影也一起完美歸位。
+          程式碼最上方已加入常數設定區。你可以自由修改顯示器、縫隙與平板的高度，所有物理運算將自動適應。
         </p>
       </div>
 
       <div 
         ref={pixiContainer} 
         className="rounded-sm shadow-2xl border-4 border-[#111315] relative overflow-hidden"
-        style={{ width: '400px', height: '850px' }}
+        // 【使用常數動態綁定外框高度】
+        style={{ width: '400px', height: `${MONITOR_H + GAP_H + TABLET_H}px` }}
       >
         {!isReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#E8E4D9] text-[#1A1C20]">
@@ -373,4 +373,4 @@ export default function App() {
       </div>
     </div>
   );
-}   
+}
