@@ -214,8 +214,8 @@ export default function App() {
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
-            // 讓 targetAlpha 從 1 平滑下降至 0.3
-            targetAlpha = 1 - (0.7 * fadeProgress);
+            // 讓 targetAlpha 從 5 平滑下降至 0.3
+            targetAlpha = 1 - (0.1 * fadeProgress);
         }
 
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
