@@ -6,7 +6,7 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   // 測試情緒詞彙
-  const words = ['焦慮', '壓力很大', '自責', '委屈', '孤單', '沒事', '不知道怎麼辦', '想念'];
+  const words = ['焦慮', '壓力', '自責', '委屈', '孤單', '沒事', '怎辦', '想念'];
 
   useEffect(() => {
     if (window.PIXI) {
@@ -47,8 +47,8 @@ export default function App() {
     uniqueChars.forEach(char => {
       const textGraphic = new window.PIXI.Text(char, {
         fontFamily: '"PingFang TC", "STKaiti", "KaiTi", serif',
-        fontSize: 34, 
-        fill: 0x1A1C20, 
+        fontSize: 27, 
+        fill: 0x111315, // 使用極深墨色，確保高對比度
         fontWeight: 'bold',
       });
       charTextures[char] = app.renderer.generateTexture(textGraphic);
@@ -70,29 +70,38 @@ export default function App() {
     const waterSprite = new window.PIXI.TilingSprite(noiseTexture, app.screen.width, app.screen.height);
     app.stage.addChild(waterSprite);
 
-    // 【架構升級：修復 WebGL 閃爍衝突】
-    // 1. 主圖層 (Master Container)：統一掌管水流扭曲，解決濾鏡衝突
+    // 【主圖層】：統一掌管水流扭曲
     const masterContainer = new window.PIXI.Container();
     const displacementFilter = new window.PIXI.DisplacementFilter(waterSprite);
     displacementFilter.scale.set(12);
     masterContainer.filters = [displacementFilter];
     app.stage.addChild(masterContainer);
 
-    // 2. 墨跡殘影層：放在主圖層內，擁有獨立的全局模糊
+    // 【墨跡殘影層：元球魔法核心】
     const trailContainer = new window.PIXI.Container();
+    
+    // 1. 全域模糊 (產生暈染的灰階邊緣)
     const globalTrailBlur = new window.PIXI.BlurFilter();
-    globalTrailBlur.blur = 3.5;
-    trailContainer.filters = [globalTrailBlur]; // 只有這層會全域模糊
+    globalTrailBlur.blur = 6.0; 
+    
+    // 2. 顏色矩陣濾鏡 (將灰階邊緣二值化，形成黏稠的水滴邊界)
+    const thresholdFilter = new window.PIXI.ColorMatrixFilter();
+    thresholdFilter.matrix = [
+      1, 0, 0, 0, 0,
+      0, 1, 0, 0, 0,
+      0, 0, 1, 0, 0,
+      0, 0, 0, 18, -5 // 關鍵：將 Alpha 通道放大 18 倍並減去 5
+    ];
+    
+    trailContainer.filters = [globalTrailBlur, thresholdFilter]; 
     masterContainer.addChild(trailContainer);
 
-    // 3. 主體文字層：放在主圖層內，不掛任何全域模糊，確保出生絕對清晰
+    // 【主體文字層】：不掛任何全域模糊與閾值，確保出生絕對清晰
     const textContainer = new window.PIXI.Container();
-    // 這裡不加 filter，完全解決了後面出來的字自帶模糊的 Bug
     masterContainer.addChild(textContainer);
 
     const drops = [];
     const inkTrails = [];
-    
     const dropQueue = [];
     let frameCounter = 0; 
 
@@ -106,9 +115,9 @@ export default function App() {
       chars.forEach((char, index) => {
         dropQueue.push({
           char: char,
-          x: eyeX + (Math.random() - 0.5) * 15, 
+          x: eyeX + (Math.random() - 0.5) * 8, 
           y: 40, 
-          triggerFrame: frameCounter + (index * 25) 
+          triggerFrame: frameCounter + (index * 12) // 較緊密的發射間隔
         });
       });
     };
@@ -120,12 +129,10 @@ export default function App() {
       drop.y = startY;
       drop.alpha = 1;
       
-      // 給每個文字獨立的模糊控制器
       const blurFilter = new window.PIXI.BlurFilter();
-      blurFilter.blur = 0; // 一開始絕對清晰
+      blurFilter.blur = 0; 
       drop.filters = [blurFilter];
 
-      // 放入文字層
       textContainer.addChild(drop);
 
       drops.push({
@@ -133,9 +140,9 @@ export default function App() {
         char: char,
         blur: blurFilter,
         vx: (Math.random() - 0.5) * 0.15, 
-        vy: Math.random() * 0.5 + 1.2,    
+        vy: Math.random() * 0.1 + 2.0, // 調整至恰當的速度
         life: 0,
-        lastTrailTime: 0
+        lastTrailY: startY // 改用距離追蹤
       });
     };
 
@@ -152,7 +159,7 @@ export default function App() {
         }
       }
 
-      waterSprite.tilePosition.y -= 1.0 * delta; 
+      waterSprite.tilePosition.y -= 1.5 * delta; 
       waterSprite.tilePosition.x -= 0.3 * delta;
 
       // 更新主文字
@@ -160,30 +167,28 @@ export default function App() {
         const drop = drops[i];
         drop.life += delta;
         drop.sprite.y += drop.vy * delta;
-        drop.sprite.x += drop.vx * delta + Math.sin(drop.life * 0.03) * 0.2; 
+        drop.sprite.x += drop.vx * delta + Math.sin(drop.life * 0.05) * 0.3; 
 
         const depthRatio = drop.sprite.y / app.screen.height; 
         
-        // 【控制文字開始模糊的時機】
-        // 在 25% 之前，(depthRatio - 0.25) 為負數，Math.max 會將其鎖在 0，保持絕對清晰
         drop.blur.blur = Math.max(0, (depthRatio - 0.25) * 6);
 
-        // 【控制文字淡出消失的時機 (70% 開始消失)】
+        // 文字淡出消失 (70% 開始)
         const fadeStart = 0.70; 
         const fadeEnd = 0.90;   
         let targetAlpha = 1;
-        
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
             targetAlpha = Math.cos(fadeProgress * (Math.PI / 2));
         }
 
-        // 平滑淡出，消除跳變閃爍
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
+        drop.sprite.visible = drop.sprite.alpha > 0.01;
 
-        // 【隱形文字持續分泌墨跡】
-        if (drop.life - drop.lastTrailTime > (15 - depthRatio * 10)) {
-          drop.lastTrailTime = drop.life;
+        // 【確保殘影互相沾黏：採用距離生成】
+        const distMoved = drop.sprite.y - drop.lastTrailY;
+        if (distMoved >= 5) {
+          drop.lastTrailY = drop.sprite.y;
           
           const trail = new window.PIXI.Sprite(charTextures[drop.char]);
           trail.anchor.set(0.5);
@@ -191,17 +196,18 @@ export default function App() {
           trail.y = drop.sprite.y;
           trail.rotation = Math.random() * 0.2 - 0.1; 
           
-          // 注意：因為外面的 trailContainer 已經有全局模糊了，
-          // 這裡不需要再 new BlurFilter，大幅節省效能與記憶體！
-          trail.alpha = 0.6; 
+          // 將殘影垂直拉長，增加重疊面積，觸發更好的 Metaball 沾黏
+          trail.scale.y = 1.5;
+          trail.scale.x = 1.0 + (depthRatio * 0.5); // 越深越寬
           
           trailContainer.addChildAt(trail, 0);
 
           inkTrails.push({
             sprite: trail,
-            scaleSpeed: 0.005 + (Math.random() * 0.008), 
-            alphaSpeed: 0.01 + (Math.random() * 0.01),  
-            vy: drop.vy * 0.3 
+            scaleSpeedX: 0.008 + (Math.random() * 0.005), 
+            scaleSpeedY: 0.002,
+            alphaSpeed: 0.015 + (Math.random() * 0.01),  
+            vy: drop.vy * 0.6 // 墨跡流動得比較慢，製造拖曳感
           });
         }
 
@@ -216,12 +222,18 @@ export default function App() {
       // 更新墨跡殘影
       for (let i = inkTrails.length - 1; i >= 0; i--) {
         const trail = inkTrails[i];
-        trail.sprite.scale.x += trail.scaleSpeed * delta;
-        trail.sprite.scale.y += trail.scaleSpeed * delta;
+        
+        trail.sprite.scale.x += trail.scaleSpeedX * delta;
+        trail.sprite.scale.y += trail.scaleSpeedY * delta;
+        
+        // 【核心視覺】：這裡降低 Alpha 並不是讓畫面變灰，
+        // 因為有 thresholdFilter 擋著，降低 Alpha 只會讓墨滴的面積「縮小」，直到斷裂！
         trail.sprite.alpha -= trail.alphaSpeed * delta;
+        
         trail.sprite.y += trail.vy * delta;
 
-        if (trail.sprite.alpha <= 0 || trail.sprite.y > app.screen.height + 150) {
+        // 當墨滴收縮到極限 (Alpha 被濾鏡過濾掉) 時銷毀
+        if (trail.sprite.alpha <= 0.2 || trail.sprite.y > app.screen.height + 150) {
           trailContainer.removeChild(trail.sprite);
           trail.sprite.destroy();
           inkTrails.splice(i, 1);
@@ -245,9 +257,9 @@ export default function App() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans p-4">
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">情緒萃取：頂部清晰無閃爍版</h1>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">情緒萃取：元球流體墨跡版</h1>
         <p className="text-sm text-gray-400 max-w-md">
-          徹底修復閃爍。文字從頂部出現絕對清晰，25%開始變模糊，70%開始消失，最後只剩墨水流動。
+          採用 Metaball 演算法！下方拖曳出的墨水現在是銳利的實心黑塊，並且會像真實液體一樣互相沾黏、融化、斷裂。
         </p>
       </div>
 
