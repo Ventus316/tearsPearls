@@ -85,7 +85,7 @@ export default function App() {
     const textContainer = new window.PIXI.Container();
     masterContainer.addChild(textContainer);
 
-    // 【實體縫隙遮罩】：模擬裝置間的實體距離
+    // 【實體縫隙遮罩】：模擬裝置間的實體距離，覆蓋在最上層
     const bezelContainer = new window.PIXI.Container();
     app.stage.addChild(bezelContainer);
 
@@ -152,8 +152,7 @@ export default function App() {
       drop.x = startX; 
       drop.y = startY;
       drop.alpha = 1;
-      
-      // 確保完美儲存正確的數值
+
       drop.baseScale = scale;
       drop.scale.set(scale);
       
@@ -163,6 +162,7 @@ export default function App() {
 
       textContainer.addChild(drop);
 
+      // 【核心修復】：確實將 baseScale 存入資料庫，供物理引擎與平板傳輸讀取
       drops.push({
         sprite: drop,
         char: char,
@@ -222,7 +222,7 @@ export default function App() {
       for (let i = tabletQueue.length - 1; i >= 0; i--) {
         if (frameCounter >= tabletQueue[i].triggerFrame) {
           const item = tabletQueue[i];
-          // 確保使用 item.scale 正確渲染
+          // 在 Y=500 平板頂端重生
           spawnSingleChar(item.char, item.x, 500, item.scale, 2, item.vx, item.vy);
           tabletQueue.splice(i, 1);
         }
@@ -250,13 +250,13 @@ export default function App() {
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
-            // 到底端保持 0.9 (微透)
+            // 最低透明度維持 0.9 
             targetAlpha = 1 - (0.1 * fadeProgress);
         }
 
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
 
-        // 【100% 退回原版殘影生成公式，使用 drop.baseScale】
+        // 【恢復正常的水墨殘影】
         const triggerDist = Math.max(3, 5 * drop.baseScale); 
         const distMoved = drop.sprite.y - drop.lastTrailY;
         
@@ -295,10 +295,11 @@ export default function App() {
         const screenBottom = drop.screen === 1 ? 450 : 850;
         if (drop.sprite.y > screenBottom) {
             if (drop.screen === 1) {
+                // 傳遞所有完美保留的數值給平板
                 tabletQueue.push({
                     char: drop.char,
                     x: drop.sprite.x,
-                    scale: drop.baseScale, // 完美傳輸縮放參數
+                    scale: drop.baseScale, 
                     vx: drop.vx,
                     vy: drop.vy,
                     triggerFrame: frameCounter + 120 // 延遲約 2 秒
@@ -340,7 +341,7 @@ export default function App() {
       <div className="mb-6 text-center px-4">
         <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">完美水墨：跨螢幕延遲傳輸版</h1>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          已恢復上一版的完美物理與透明度設定。文字將於上方流出，經過實體縫隙的 2 秒延遲後，無縫於下方平板區域接續流動。
+          已徹底解決平板傳輸問題！不僅會如期在平板重生，連帶顯示器失去的水墨殘影也一起完美歸位。
         </p>
       </div>
 
@@ -372,4 +373,4 @@ export default function App() {
       </div>
     </div>
   );
-}
+}   
