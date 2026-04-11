@@ -1,6 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as PIXI from 'pixi.js'
-import './index.css'
 
 export default function App() {
   const pixiContainer = useRef(null);
@@ -49,7 +47,6 @@ export default function App() {
     uniqueChars.forEach(char => {
       const textGraphic = new window.PIXI.Text(char, {
         fontFamily: '"PingFang TC", "STKaiti", "KaiTi", serif',
-        // 依照要求，設定最大值為 24
         fontSize: 24, 
         fill: 0x111315, 
         fontWeight: 'bold',
@@ -80,20 +77,8 @@ export default function App() {
     masterContainer.filters = [displacementFilter];
     app.stage.addChild(masterContainer);
 
-    // 【墨跡殘影層：元球魔法核心】
+    // 【墨跡殘影層】：已移除元球閾值濾鏡，回歸常規圖層
     const trailContainer = new window.PIXI.Container();
-    const globalTrailBlur = new window.PIXI.BlurFilter();
-    globalTrailBlur.blur = 6.0; 
-    
-    const thresholdFilter = new window.PIXI.ColorMatrixFilter();
-    thresholdFilter.matrix = [
-      1, 0, 0, 0, 0,
-      0, 1, 0, 0, 0,
-      0, 0, 1, 0, 0,
-      0, 0, 0, 18, -5 
-    ];
-    
-    trailContainer.filters = [globalTrailBlur, thresholdFilter]; 
     masterContainer.addChild(trailContainer);
 
     // 【主體文字層】
@@ -117,9 +102,6 @@ export default function App() {
       const chars = word.split('');
       const isLeftEye = Math.random() > 0.5;
       
-      // 計算虛擬眼頭/眼尾座標
-      // 左眼中心 0.3，眼頭向右(鼻樑)，眼尾向左
-      // 右眼中心 0.7，眼頭向左(鼻樑)，眼尾向右
       const baseEyeX = isLeftEye ? app.screen.width * 0.3 : app.screen.width * 0.7;
       const eyeOffset = 22; // 眼頭與眼尾的距離
       let eyeX = baseEyeX;
@@ -133,10 +115,10 @@ export default function App() {
       chars.forEach((char, index) => {
         dropQueue.push({
           char: char,
-          x: eyeX + (Math.random() - 0.5) * (8 * sizeScale), // 根據大小動態調整橫向微移
+          x: eyeX + (Math.random() - 0.5) * (8 * sizeScale), 
           y: 40, 
           triggerFrame: frameCounter + (index * 12), 
-          scale: sizeScale // 傳遞動態大小
+          scale: sizeScale 
         });
       });
     };
@@ -148,7 +130,6 @@ export default function App() {
       drop.y = startY;
       drop.alpha = 1;
       
-      // 套用傳遞過來的情緒動態縮放
       drop.baseScale = scale;
       drop.scale.set(scale);
       
@@ -163,7 +144,6 @@ export default function App() {
         char: char,
         blur: blurFilter,
         vx: (Math.random() - 0.5) * 0.15, 
-        // 讓小眼淚流得稍微慢一點點，增加物理寫實感
         vy: (Math.random() * 0.1 + 2.0) * (0.8 + scale * 0.2), 
         life: 0,
         lastTrailY: startY 
@@ -183,30 +163,23 @@ export default function App() {
     app.ticker.add((delta) => {
       frameCounter += delta;
 
-      // 【情緒崩潰時間軸引擎】
       if (isCrying) {
-        cryingTime += delta * 16.66; // 轉換 delta 為近似毫秒
-        const p = Math.min(cryingTime / cryingDuration, 1); // 0 到 1 的進度
+        cryingTime += delta * 16.66; 
+        const p = Math.min(cryingTime / cryingDuration, 1); 
 
-        // 1. 生成頻率 (Rate)：開始慢(1200ms) -> 中間快(400ms) -> 結束慢(1200ms)
         const currentInterval = 1200 - Math.sin(p * Math.PI) * 800; 
         const framesPerWord = currentInterval / 16.66;
 
         wordSpawnTimer += delta;
         if (wordSpawnTimer >= framesPerWord) {
           wordSpawnTimer = 0;
-          
-          // 2. 眼位機率 (Inner/Outer)：進度越近1，越不可能是眼頭 (眼頭先乾涸)
           const isInner = Math.random() < (1 - p);
-          
-          // 3. 淚滴大小 (Scale)：開始小(0.4) -> 巔峰最大(1.0，即 24px) -> 結束小(0.4)
           const sizeScale = 0.4 + Math.sin(p * Math.PI) * 0.6;
-          
           spawnWordFlow(isInner, sizeScale);
         }
 
         if (p === 1) {
-          isCrying = false; // 10 秒後完全停止分泌眼淚
+          isCrying = false; 
         }
       }
 
@@ -231,23 +204,23 @@ export default function App() {
 
         const depthRatio = drop.sprite.y / app.screen.height; 
         
-        // 40% 開始模糊，並在 fadeEnd 停止增加模糊度
+        // 40% 開始模糊，最大模糊深度計算到 1.0 (畫布底端)
         const fadeStart = 0.70; 
-        const fadeEnd = 0.90;   
+        const fadeEnd = 1.0;   
         const blurDepth = Math.min(depthRatio, fadeEnd);
         drop.blur.blur = Math.max(0, (blurDepth - 0.40) * 10);
 
+        // 【修改透明度邏輯】：確保最低只會降到 0.3
         let targetAlpha = 1;
         if (depthRatio > fadeStart) {
             const fadeProgress = Math.min((depthRatio - fadeStart) / (fadeEnd - fadeStart), 1);
-            targetAlpha = Math.cos(fadeProgress * (Math.PI / 2));
+            // 讓 targetAlpha 從 1 平滑下降至 0.3
+            targetAlpha = 1 - (0.7 * fadeProgress);
         }
 
         drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * 0.15;
-        drop.sprite.visible = drop.sprite.alpha > 0.01;
 
-        // 【產生沾黏殘影】
-        // 因應小眼淚，動態調整觸發間距，確保小眼淚的殘影也能連貫
+        // 【產生殘影】
         const triggerDist = Math.max(3, 5 * drop.baseScale); 
         const distMoved = drop.sprite.y - drop.lastTrailY;
         
@@ -260,23 +233,31 @@ export default function App() {
           trail.y = drop.sprite.y;
           trail.rotation = Math.random() * 0.2 - 0.1; 
           
-          // 殘影依據文字本身的大小按比例延伸
           trail.scale.y = 1.6 * drop.baseScale;
           trail.scale.x = (1.0 + (depthRatio * 0.5)) * drop.baseScale; 
+          
+          // 恢復個別殘影的模糊濾鏡 (因為移除了全域元球模糊)
+          const trailBlur = new window.PIXI.BlurFilter();
+          trailBlur.blur = 2.0 + (depthRatio * 5);
+          trail.filters = [trailBlur];
+          
+          // 殘影起始透明度稍微降低，避免重疊過黑
+          trail.alpha = 0.5; 
           
           trailContainer.addChildAt(trail, 0);
 
           inkTrails.push({
             sprite: trail,
+            blurFilter: trailBlur, // 儲存起來以便後續增加模糊度
             scaleSpeedX: 0.008 + (Math.random() * 0.005), 
             scaleSpeedY: 0.002,
-            // 小眼淚消散稍微快一點
             alphaSpeed: (0.015 + (Math.random() * 0.01)) / Math.max(0.6, drop.baseScale),  
             vy: drop.vy * 0.6 
           });
         }
 
-        if (drop.sprite.alpha < 0.01 && drop.sprite.y > app.screen.height + 80) {
+        // 【修改銷毀邏輯】：不再根據 alpha 判斷，只要掉出畫面下方就銷毀
+        if (drop.sprite.y > app.screen.height + 80) {
           textContainer.removeChild(drop.sprite);
           drop.sprite.destroy();
           drops.splice(i, 1);
@@ -291,8 +272,14 @@ export default function App() {
         trail.sprite.scale.y += trail.scaleSpeedY * delta;
         trail.sprite.alpha -= trail.alphaSpeed * delta;
         trail.sprite.y += trail.vy * delta;
+        
+        // 殘影隨時間變得越來越模糊
+        if (trail.blurFilter) {
+          trail.blurFilter.blur += 0.2 * delta;
+        }
 
-        if (trail.sprite.alpha <= 0.2 || trail.sprite.y > app.screen.height + 150) {
+        // 殘影完全消失或掉出畫面時銷毀
+        if (trail.sprite.alpha <= 0.01 || trail.sprite.y > app.screen.height + 150) {
           trailContainer.removeChild(trail.sprite);
           trail.sprite.destroy();
           inkTrails.splice(i, 1);
@@ -306,9 +293,9 @@ export default function App() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans p-4">
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">情緒萃取：眼位起伏與情緒弧線版</h1>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">情緒萃取：常規水墨微透版</h1>
         <p className="text-sm text-gray-400 max-w-md">
-          按下模擬崩潰。眼淚將從小顆的眼頭蓄積，達到全尺寸的雙眼崩潰，最後以眼尾的微弱殘滴結束。
+          已移除元球效果。文字在畫面底部時會保留 0.3 的透明度，不會完全隱形消失。
         </p>
       </div>
 
