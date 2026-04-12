@@ -15,6 +15,7 @@ export const BEZEL_COLOR = 0x1A1C20;
 
 export const FONT_FAMILY = '"PingFang TC", "STKaiti", "KaiTi", serif';
 export const FONT_SIZE_BASE = 24;    
+export const TEXT_STROKE_WIDTH = 1; // 白邊粗細 (px)
 
 export const CRYING_DURATION = 10000; 
 export const NETWORK_DELAY_FRAMES = 120; 
@@ -48,3 +49,11 @@ export const TRAIL_DEPTH_ALPHA_MULTIPLIER = 0.4;
 export const TRAIL_EXPAND_SPEED_Y = 0.002; 
 export const TRAIL_BLUR_INCREASE_RATE = 0.2; 
 export const TRAIL_GRAVITY_MULTIPLIER = 0.6;
+
+// ==========================================
+// ✨ 寶石匯聚動畫參數 (已解耦)
+// ==========================================
+export const CONVERGE_SPEED_MOVE = 0.01;  // 飛向寶石中心的速度 (數字越小，吸過去的軌跡越滑順)
+export const CONVERGE_FADE_DISTANCE = -100; // 距離寶石多近(px)時才開始透明化 (解決半空消失的問題)
+export const CONVERGE_SPEED_ALPHA = 0.96; // 透明化的速度
+export const CONVERGE_SPEED_SCALE = 0.99; // 縮小的速度

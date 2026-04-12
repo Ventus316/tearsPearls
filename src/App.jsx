@@ -1,6 +1,5 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from 'react';
-// 【微調1】: 多引入 GAP_H 用來畫初始畫面的縫隙
 import { TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
 import { createInkEngine } from './engine/InkEngine';
 
@@ -10,7 +9,6 @@ export default function App() {
   const engineRef = useRef(null); 
   const eyeCoordsRef = useRef(null);
   
-  // 狀態機：init -> loading -> ready -> playing -> finished
   const [interactionState, setInteractionState] = useState('init');
 
   useEffect(() => {
@@ -65,10 +63,7 @@ export default function App() {
       const vision = await visionModule.FilesetResolver.forVisionTasks(mpBase + '/wasm');
       
       faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, {
-        baseOptions: { 
-          modelAssetPath: modelBase, 
-          delegate: "GPU" 
-        },
+        baseOptions: { modelAssetPath: modelBase, delegate: "GPU" },
         runningMode: "VIDEO",
         numFaces: 1
       });
@@ -79,19 +74,18 @@ export default function App() {
       return;
     }
 
-    // 啟動引擎時，傳入動畫播畢的回調函數 (onComplete)
     if (!engineRef.current && videoRef.current) {
       engineRef.current = createInkEngine(
         pixiContainer.current, 
         () => eyeCoordsRef.current, 
         videoRef.current,
-        () => setInteractionState('finished') // 動畫播完時觸發，顯示「再次體驗」
+        () => setInteractionState('finished') 
       );
     }
 
     if (faceLandmarker) {
         startTracking(faceLandmarker);
-        setInteractionState('ready'); // 全部準備完畢，顯示選詞按鈕
+        setInteractionState('ready'); 
     }
   };
 
@@ -150,71 +144,66 @@ export default function App() {
   return (
     <div className="flex flex-col items-center py-6 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
       <div className="mb-4 text-center px-4">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">0.7.2：實體機台互動流程版</h1>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">0.7.4：寶石煉化與延遲 UI 版</h1>
       </div>
 
       <div className="relative rounded-sm shadow-2xl border-4 border-[#111315] overflow-hidden bg-[#E8E4D9]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
         
-        {/* 【微調2】：靜態實體機台背景 (在 PIXI 載入前，提供完美的顯示器與縫隙視覺結構) */}
         <div className="absolute inset-0 flex flex-col pointer-events-none z-0">
-          <div style={{ height: `${MONITOR_H}px` }} className="w-full bg-[#111315]"></div> {/* 顯示器黑畫面 */}
-          <div style={{ height: `${GAP_H}px` }} className="w-full bg-[#1A1C20]"></div>     {/* 實體縫隙 */}
-          <div style={{ height: `${TABLET_H}px` }} className="w-full bg-[#E8E4D9]"></div> {/* 平板區域 */}
+          <div style={{ height: `${MONITOR_H}px` }} className="w-full bg-[#111315]"></div> 
+          <div style={{ height: `${GAP_H}px` }} className="w-full bg-[#1A1C20]"></div>     
+          <div style={{ height: `${TABLET_H}px` }} className="w-full bg-[#E8E4D9]"></div> 
         </div>
 
-        {/* 隱藏的攝影機串流，僅供底層取用 */}
         <video ref={videoRef} playsInline muted autoPlay style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
 
-        {/* PIXI 畫布 (加上 z-10，啟動後 PIXI 會完美蓋在上方靜態背景之上) */}
         <div ref={pixiContainer} className="absolute inset-0 z-10" />
 
-        {/* 實體平板上的 UI 介面層 (加上 z-20 確保 UI 永遠在最上層) */}
+        {/* 【空間調整】移除 justify-center，改用絕對的 top 距離，將 UI 釘在平板最上方 */}
         <div 
-          className="absolute left-0 w-full flex items-center justify-center pointer-events-none z-20"
-          style={{ top: `${TABLET_START_Y}px`, height: `${TABLET_H}px` }}
+          className="absolute left-0 w-full flex justify-center pointer-events-none z-20"
+          style={{ top: `${TABLET_START_Y + 32}px` }}
         >
-          {interactionState !== 'playing' && (
-            <div className="pointer-events-auto flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-8 py-8 rounded-3xl border border-gray-700 shadow-2xl transition-opacity duration-500 w-[300px]">
-              
-              {interactionState === 'init' && (
-                <>
-                  <p className="text-gray-300 text-sm mb-2 font-light">點擊以啟動互動裝置</p>
-                  <button onClick={initCameraAndAI} className="w-full px-6 py-4 bg-blue-700 hover:bg-blue-600 rounded-full font-bold shadow-lg text-white text-lg tracking-wider transition-transform active:scale-95">
-                    啟動鏡頭與 AI
-                  </button>
-                </>
-              )}
-              
-              {interactionState === 'loading' && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white tracking-widest text-sm">模組載入中...</span>
-                </div>
-              )}
+          <div className={`pointer-events-auto transition-opacity duration-700 ${interactionState === 'playing' ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+            
+            {interactionState === 'init' && (
+              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[300px]">
+                <p className="text-gray-300 text-sm font-light tracking-widest">點擊以啟動互動裝置</p>
+                <button onClick={initCameraAndAI} className="w-full px-8 py-3 bg-[#1d4ed8] hover:bg-blue-600 rounded-full font-bold shadow-lg text-white text-lg tracking-widest transition-transform active:scale-95">
+                  啟動鏡頭與 AI
+                </button>
+              </div>
+            )}
+            
+            {interactionState === 'loading' && (
+              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[300px]">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-white tracking-widest text-sm">模組載入中...</span>
+              </div>
+            )}
 
-              {interactionState === 'ready' && (
-                <>
-                  <p className="text-gray-300 text-sm mb-2 font-light">請選擇您的情緒出口</p>
-                  <button onClick={handleSpawnWord} className="w-full px-6 py-3 bg-[#2A2B2E] hover:bg-[#3f3f46] rounded-full border border-gray-500 text-white tracking-wider transition-transform active:scale-95">
-                    流出單一詞彙
-                  </button>
-                  <button onClick={handleCrying} className="w-full px-6 py-3 bg-[#c2410c] hover:bg-[#9a3412] rounded-full shadow-lg text-white tracking-wider font-bold transition-transform active:scale-95">
-                    情緒崩潰 (10秒)
-                  </button>
-                </>
-              )}
+            {interactionState === 'ready' && (
+              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[300px]">
+                <p className="text-gray-300 text-sm mb-2 font-light">請選擇您的情緒出口</p>
+                <button onClick={handleSpawnWord} className="w-full px-6 py-3 bg-[#2A2B2E] hover:bg-[#3f3f46] rounded-full border border-gray-500 text-white tracking-wider transition-transform active:scale-95">
+                  流出單一詞彙
+                </button>
+                <button onClick={handleCrying} className="w-full px-6 py-3 bg-[#c2410c] hover:bg-[#9a3412] rounded-full shadow-lg text-white tracking-wider font-bold transition-transform active:scale-95">
+                  情緒崩潰 (10秒)
+                </button>
+              </div>
+            )}
 
-              {interactionState === 'finished' && (
-                <>
-                  <p className="text-gray-300 text-sm mb-2 font-light">情緒已宣洩完畢</p>
-                  <button onClick={handleTryAgain} className="w-full px-6 py-4 bg-emerald-700 hover:bg-emerald-600 rounded-full font-bold shadow-lg text-white tracking-wider text-lg transition-transform active:scale-95">
-                    再次體驗
-                  </button>
-                </>
-              )}
+            {interactionState === 'finished' && (
+              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[300px]">
+                <p className="text-gray-300 text-sm font-light tracking-widest">情緒已宣洩完畢</p>
+                <button onClick={handleTryAgain} className="w-full px-10 py-3 bg-emerald-700 hover:bg-emerald-600 rounded-full font-bold shadow-lg text-white tracking-widest text-lg transition-transform active:scale-95">
+                  再次體驗
+                </button>
+              </div>
+            )}
 
-            </div>
-          )}
+          </div>
         </div>
 
       </div>
