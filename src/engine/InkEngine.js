@@ -1,6 +1,6 @@
 // src/engine/InkEngine.js
 import { 
-  WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_H, TABLET_START_Y, VIRTUAL_H, 
+  WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H, VIRTUAL_H, 
   CRYING_DURATION, BG_COLOR, TEXT_COLOR, BEZEL_COLOR, FONT_FAMILY, FONT_SIZE_BASE,
   NETWORK_DELAY_FRAMES, DISPLACEMENT_STRENGTH, WATER_SPEED_Y, WATER_SPEED_X,
   EYE_OFFSET, WORD_SPAWN_INTERVAL, BASE_VELOCITY_X, SWAY_FREQUENCY, SWAY_AMPLITUDE,
@@ -10,12 +10,8 @@ import {
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER
 } from '../config/constants';
 
-
-// =========================================================================
-// 📂 檔案二：本機端的 src/engine/InkEngine.js
-// =========================================================================
-export function createInkEngine(containerElement, getEyeData, videoElement) {
-    const app = new window.PIXI.Application({
+export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
+  const app = new window.PIXI.Application({
     width: 400,
     height: TOTAL_H, 
     backgroundColor: BG_COLOR,
@@ -25,7 +21,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   
   containerElement.appendChild(app.view);
 
-  // --- 1. 預渲染文字 ---
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
@@ -36,7 +31,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
     textGraphic.destroy();
   });
 
-  // --- 2. 攝影機背景圖層 (僅限顯示器區域) ---
   const videoBaseTexture = new window.PIXI.BaseTexture(videoElement);
   const videoTexture = new window.PIXI.Texture(videoBaseTexture);
   const videoSprite = new window.PIXI.Sprite(videoTexture);
@@ -45,7 +39,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   videoSprite.anchor.set(0.5);
   videoContainer.addChild(videoSprite);
 
-  // 加上遮罩，確保攝影機畫面「絕對不會」流到平板區
   const monitorMask = new window.PIXI.Graphics();
   monitorMask.beginFill(0xFFFFFF);
   monitorMask.drawRect(0, 0, 400, MONITOR_H);
@@ -55,25 +48,22 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   app.stage.addChildAt(videoContainer, 0); 
   app.stage.addChildAt(monitorMask, 0);
 
-  // --- 3. 平板區專屬底色 ---
   const tabletBg = new window.PIXI.Graphics();
   tabletBg.beginFill(BG_COLOR);
-  tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); // 這裡就不會報錯了！
+  tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H);
   tabletBg.endFill();
   app.stage.addChildAt(tabletBg, 1); 
 
-  // --- 4. 水波紋理與扭曲 ---
-  const svgNoise = `
-    <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  const svgNoiseUrl = 'data:image/svg+xml;base64,' + btoa(`
+    <svg viewBox="0 0 512 512" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
       <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" stitchTiles="stitch" /></filter>
       <rect width="100%" height="100%" filter="url(#noise)" />
     </svg>
-  `;
-  const noiseUrl = `data:image/svg+xml;base64,${btoa(svgNoise)}`;
-  const noiseTexture = window.PIXI.Texture.from(noiseUrl);
+  `);
+  const noiseTexture = window.PIXI.Texture.from(svgNoiseUrl);
   const waterSprite = new window.PIXI.TilingSprite(noiseTexture, app.screen.width, app.screen.height);
   
-  waterSprite.alpha = 0.15; // 透明度讓底下的攝影機可見
+  waterSprite.alpha = 0.15; 
   app.stage.addChild(waterSprite);
 
   const masterContainer = new window.PIXI.Container();
@@ -87,7 +77,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   const textContainer = new window.PIXI.Container();
   masterContainer.addChild(textContainer);
 
-  // --- 5. 實體縫隙遮罩 ---
   const bezelContainer = new window.PIXI.Container();
   app.stage.addChild(bezelContainer);
 
@@ -97,14 +86,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   bezel.endFill();
   bezelContainer.addChild(bezel);
 
-  const delayText = new window.PIXI.Text("網路傳輸延遲中 (2 秒)...", {
-      fontFamily: 'sans-serif', fontSize: 12, fill: 0x666666, align: 'center', letterSpacing: 2
-  });
-  delayText.anchor.set(0.5);
-  delayText.position.set(200, MONITOR_H + (GAP_H / 2));
-  bezelContainer.addChild(delayText);
-
-  // --- 6. 變數與狀態 ---
   const drops = [];
   const inkTrails = [];
   const dropQueue = [];
@@ -113,6 +94,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   let isCrying = false;
   let cryingTime = 0;
   let wordSpawnTimer = 0;
+  let wasActive = false; 
 
   const spawnWordFlow = (isInner = Math.random() > 0.5, sizeScale = 1.0) => {
     const word = WORDS[Math.floor(Math.random() * WORDS.length)];
@@ -172,13 +154,12 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
   app.ticker.add((delta) => {
     frameCounter += delta;
 
-    // 動態計算攝影機比例，只填滿上半部 MONITOR_H
     if (videoElement.videoWidth > 0) {
        const vw = videoElement.videoWidth;
        const vh = videoElement.videoHeight;
        const scale = Math.max(400 / vw, MONITOR_H / vh);
        videoSprite.scale.set(scale);
-       videoSprite.scale.x *= -1; // 鏡像
+       videoSprite.scale.x *= -1; 
        videoSprite.position.set(200, MONITOR_H / 2); 
     }
 
@@ -282,6 +263,12 @@ export function createInkEngine(containerElement, getEyeData, videoElement) {
         inkTrails.splice(i, 1);
       }
     }
+
+    const isActive = isCrying || dropQueue.length > 0 || tabletQueue.length > 0 || drops.length > 0 || inkTrails.length > 0;
+    if (wasActive && !isActive) {
+      if (typeof onComplete === 'function') onComplete();
+    }
+    wasActive = isActive; 
   });
 
   return {

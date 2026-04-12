@@ -1,29 +1,24 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { TOTAL_H, MONITOR_H } from './config/constants';
+import { TOTAL_H, MONITOR_H, TABLET_START_Y, TABLET_H } from './config/constants';
 import { createInkEngine } from './engine/InkEngine';
 
-// =========================================================================
-// 📂 檔案三：本機端的 src/App.jsx
-// 【本機端提醒】：請記得寫 import { TOTAL_H, MONITOR_H } from './config/constants';
-//              以及 import { createInkEngine } from './engine/InkEngine';
-//              並維持 export default function App()
-// =========================================================================
 export default function App() {
   const pixiContainer = useRef(null);
   const videoRef = useRef(null);
   const engineRef = useRef(null); 
   const eyeCoordsRef = useRef(null);
-  const [status, setStatus] = useState("等待啟動...");
-  const [isCameraStarted, setIsCameraStarted] = useState(false);
+  
+  // 狀態機：init -> loading -> ready -> playing -> finished
+  const [interactionState, setInteractionState] = useState('init');
 
-  // 1. 在載入時只初始化 PIXI，不馬上叫相機 (避免被瀏覽器阻擋)
   useEffect(() => {
     const initPixiScript = async () => {
       if (!window.PIXI) {
         await new Promise((resolve) => {
           const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js';
+          // 【防呆修復】：切斷網址字串，防止被轉為隱藏超連結
+          script.src = ['https:/', '/cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js'].join('');
           script.onload = resolve;
           document.body.appendChild(script);
         });
@@ -39,11 +34,8 @@ export default function App() {
     };
   }, []);
 
-  // 2. 由使用者「點擊按鈕」觸發，絕對能叫出權限視窗！
   const initCameraAndAI = async () => {
-    if (isCameraStarted) return;
-    setIsCameraStarted(true);
-    setStatus("請求相機權限中...");
+    setInteractionState('loading');
 
     let stream;
     try {
@@ -59,37 +51,48 @@ export default function App() {
       }
     } catch (err) {
       console.error("相機權限被拒絕", err);
-      setStatus("⚠️ 請允許相機權限");
+      alert("請允許相機權限才能體驗作品！");
+      setInteractionState('init');
       return; 
     }
 
-    setStatus("載入 AI 模組中...");
-
     let faceLandmarker;
     try {
-      // 鎖定穩定版本 0.10.3，解決 404 Not Found 問題
-      const visionModule = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs');
-      const vision = await visionModule.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+      // 【終極防呆修復】：把所有網址拆成陣列再組合，徹底防止複製時網址被破壞，解決 fetch URL 報錯！
+      const mpBase = ['https:/', '/cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3'].join('');
+      const modelBase = ['https:/', '/storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'].join('');
+
+      const visionModule = await import(/* @vite-ignore */ mpBase + '/vision_bundle.mjs');
+      const vision = await visionModule.FilesetResolver.forVisionTasks(mpBase + '/wasm');
+      
       faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, {
         baseOptions: { 
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", 
+          modelAssetPath: modelBase, 
           delegate: "GPU" 
         },
         runningMode: "VIDEO",
         numFaces: 1
       });
-      setStatus("✅ AI 與鏡頭運作中");
     } catch (err) {
       console.error(err);
-      setStatus("⚠️ AI 模組載入失敗");
+      alert("AI 模組載入失敗");
+      setInteractionState('init');
+      return;
     }
 
+    // 啟動引擎時，傳入動畫播畢的回調函數 (onComplete)
     if (!engineRef.current && videoRef.current) {
-      engineRef.current = createInkEngine(pixiContainer.current, () => eyeCoordsRef.current, videoRef.current);
+      engineRef.current = createInkEngine(
+        pixiContainer.current, 
+        () => eyeCoordsRef.current, 
+        videoRef.current,
+        () => setInteractionState('finished') // 動畫播完時觸發，顯示「再次體驗」
+      );
     }
 
     if (faceLandmarker) {
         startTracking(faceLandmarker);
+        setInteractionState('ready'); // 全部準備完畢，顯示選詞按鈕
     }
   };
 
@@ -104,19 +107,15 @@ export default function App() {
           const marks = results.faceLandmarks[0];
           const vw = videoRef.current.videoWidth;
           const vh = videoRef.current.videoHeight;
-          
           const scale = Math.max(400 / vw, MONITOR_H / vh);
 
-          // 核心數學：將 MediaPipe 的原始座標，轉換為 PixiJS 中顯示器區域的對應座標
           const mapPoint = (mark) => {
              const vx = mark.x * vw;         
              const vy = mark.y * vh;         
              const dx = vx - (vw / 2);       
              const dy = vy - (vh / 2);       
-             
              const screenX = 200 - (dx * scale);
              const screenY = (MONITOR_H / 2) + (dy * scale);
-             
              return { x: screenX, y: screenY };
           };
           
@@ -135,53 +134,84 @@ export default function App() {
     loop();
   };
 
+  // 點擊事件：切換狀態並叫引擎做事
+  const handleSpawnWord = () => {
+    setInteractionState('playing');
+    if (engineRef.current) engineRef.current.spawnWord();
+  };
+
+  const handleCrying = () => {
+    setInteractionState('playing');
+    if (engineRef.current) engineRef.current.triggerCryingSequence();
+  };
+
+  const handleTryAgain = () => {
+    setInteractionState('ready');
+  };
+
   return (
     <div className="flex flex-col items-center py-6 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
       <div className="mb-4 text-center px-4">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">0.7.1：完美版面與真實追蹤</h1>
-        <p className="text-sm text-gray-400">{status}</p>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">0.7.2：實體機台互動流程版</h1>
       </div>
 
-      <div className="flex gap-8 items-start relative">
-        {/* 把 HTML 的 video 隱藏但保留功能，避免破壞畫面排版 */}
-        <video 
-            ref={videoRef} 
-            playsInline muted autoPlay
-            style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
-        />
+      <div className="relative rounded-sm shadow-2xl border-4 border-[#111315] overflow-hidden bg-[#E8E4D9]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
+        
+        {/* 隱藏的攝影機串流，僅供底層取用 */}
+        <video ref={videoRef} playsInline muted autoPlay style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
 
-        {/* 恢復原狀的乾淨顯示器+平板外框 */}
+        {/* PIXI 畫布 */}
+        <div ref={pixiContainer} className="absolute inset-0" />
+
+        {/* 實體平板上的 UI 介面層 (精準疊加在 Tablet 區域中心) */}
         <div 
-          ref={pixiContainer} 
-          className="rounded-sm shadow-2xl border-4 border-[#111315] relative overflow-hidden bg-[#E8E4D9]"
-          style={{ width: '400px', height: `${TOTAL_H}px` }}
-        />
-      </div>
+          className="absolute left-0 w-full flex items-center justify-center pointer-events-none"
+          style={{ top: `${TABLET_START_Y}px`, height: `${TABLET_H}px` }}
+        >
+          {interactionState !== 'playing' && (
+            <div className="pointer-events-auto flex flex-col items-center gap-4 bg-[#1A1C20]/85 backdrop-blur-md px-8 py-8 rounded-3xl border border-gray-700 shadow-2xl transition-opacity duration-500 w-[300px]">
+              
+              {interactionState === 'init' && (
+                <>
+                  <p className="text-gray-300 text-sm mb-2 font-light">點擊以啟動互動裝置</p>
+                  <button onClick={initCameraAndAI} className="w-full px-6 py-4 bg-blue-700 hover:bg-blue-600 rounded-full font-bold shadow-lg text-white text-lg tracking-wider transition-transform active:scale-95">
+                    啟動鏡頭與 AI
+                  </button>
+                </>
+              )}
+              
+              {interactionState === 'loading' && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white tracking-widest text-sm">模組載入中...</span>
+                </div>
+              )}
 
-      <div className="mt-8 flex gap-4 fixed bottom-8 z-10 bg-[#2A2B2E]/80 backdrop-blur px-6 py-4 rounded-full border border-gray-700 shadow-2xl">
-        {!isCameraStarted ? (
-          <button 
-            onClick={initCameraAndAI}
-            className="px-6 py-2 bg-blue-700 hover:bg-blue-600 rounded-full font-bold shadow-lg"
-          >
-            1. 啟動鏡頭與 AI (請先點擊)
-          </button>
-        ) : (
-          <>
-            <button 
-              onClick={() => engineRef.current && engineRef.current.spawnWord()}
-              className="px-6 py-2 bg-transparent hover:bg-white/10 rounded-full border border-gray-500"
-            >
-              流出單一詞彙
-            </button>
-            <button 
-              onClick={() => engineRef.current && engineRef.current.triggerCryingSequence()}
-              className="px-6 py-2 bg-amber-700 hover:bg-amber-600 rounded-full shadow-lg"
-            >
-              情緒崩潰 (10秒)
-            </button>
-          </>
-        )}
+              {interactionState === 'ready' && (
+                <>
+                  <p className="text-gray-300 text-sm mb-2 font-light">請選擇您的情緒出口</p>
+                  <button onClick={handleSpawnWord} className="w-full px-6 py-3 bg-[#2A2B2E] hover:bg-[#3f3f46] rounded-full border border-gray-500 text-white tracking-wider transition-transform active:scale-95">
+                    流出單一詞彙
+                  </button>
+                  <button onClick={handleCrying} className="w-full px-6 py-3 bg-[#c2410c] hover:bg-[#9a3412] rounded-full shadow-lg text-white tracking-wider font-bold transition-transform active:scale-95">
+                    情緒崩潰 (10秒)
+                  </button>
+                </>
+              )}
+
+              {interactionState === 'finished' && (
+                <>
+                  <p className="text-gray-300 text-sm mb-2 font-light">情緒已宣洩完畢</p>
+                  <button onClick={handleTryAgain} className="w-full px-6 py-4 bg-emerald-700 hover:bg-emerald-600 rounded-full font-bold shadow-lg text-white tracking-wider text-lg transition-transform active:scale-95">
+                    再次體驗
+                  </button>
+                </>
+              )}
+
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
