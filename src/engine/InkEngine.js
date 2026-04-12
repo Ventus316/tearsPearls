@@ -8,7 +8,7 @@ import {
   TRAIL_SPAWN_DENSITY, TRAIL_START_DEPTH, TRAIL_SCALE_Y, TRAIL_SCALE_X_BASE, 
   TRAIL_SCALE_X_DEPTH_MULTIPLIER, TRAIL_INITIAL_BLUR_MULTIPLIER, TRAIL_BASE_ALPHA, 
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER,
-  CONVERGE_SPEED_MOVE, CONVERGE_FADE_DISTANCE, CONVERGE_SPEED_ALPHA, CONVERGE_SPEED_SCALE 
+  CONVERGE_SPEED_MOVE, CONVERGE_SPEED_ALPHA, CONVERGE_SPEED_SCALE, CONVERGE_BOTTOM_OFFSET, CONVERGE_FADE_HEIGHT
 } from '../config/constants';
 
 export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
@@ -77,8 +77,16 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   const textContainer = new window.PIXI.Container();
   masterContainer.addChild(textContainer);
 
-  // --- 寶石相關設定 ---
+  // --- 視覺與物理座標定義 ---
+  // 1. 寶石的視覺位置 (可自由調整，不影響文字匯聚軌跡)
   const GEM_CENTER_Y = TABLET_START_Y + (TABLET_H * 0.7); 
+  
+  // 2. 文字匯聚的物理引力點 (依賴常數設定)
+  const GRAVITY_Y = TABLET_START_Y + TABLET_H - CONVERGE_BOTTOM_OFFSET;
+  
+  // 3. 透明化與縮小的觸發水平線 (依賴常數設定)
+  const FADE_START_Y = TABLET_START_Y + TABLET_H - CONVERGE_FADE_HEIGHT;
+
   let currentGemScale = 0;
   let targetGemScale = 0;
   let showGem = false; 
@@ -211,23 +219,23 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       const drop = drops[i]; drop.life += delta;
 
       if (drop.isConverging) {
-        // --- ✨ 解耦後的匯聚物理學 ---
+        // --- 解耦的匯聚物理學：往平板底部引力點飛 ---
         const dx = 200 - drop.sprite.x;
-        const dy = GEM_CENTER_Y - drop.sprite.y;
-        const dist = Math.hypot(dx, dy);
+        const dy = GRAVITY_Y - drop.sprite.y;
 
-        // 1. 移動：永遠套用位移，確保文字能抵達目標
+        // 1. 移動：永遠套用位移，確保文字能抵達底部中心
         drop.sprite.x += dx * CONVERGE_SPEED_MOVE * delta;
         drop.sprite.y += dy * CONVERGE_SPEED_MOVE * delta;
 
-        // 2. 消失：只有當文字距離寶石夠近時，才開始縮小變透明
-        if (dist < CONVERGE_FADE_DISTANCE) {
+        // 2. 消失與縮小：只有當文字掉落超過觸發線時，才開始透明化
+        if (drop.sprite.y > FADE_START_Y) {
             drop.sprite.alpha *= CONVERGE_SPEED_ALPHA;
             drop.sprite.scale.set(drop.sprite.scale.x * CONVERGE_SPEED_SCALE);
         }
 
-        // 3. 吸收：極度靠近時觸發寶石能量增加
-        if (dist < 15 || drop.sprite.alpha < 0.05) {
+        // 3. 吸收：當距離引力點極近，或已經完全透明時觸發寶石能量
+        const distToGravity = Math.hypot(dx, dy);
+        if (distToGravity < 15 || drop.sprite.alpha < 0.05) {
             targetGemScale = Math.min(targetGemScale + 0.15, 1.2); 
             textContainer.removeChild(drop.sprite); drop.sprite.destroy(); drops.splice(i, 1);
         }
@@ -276,7 +284,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       }
     }
 
-    // --- 動畫完結與寶石觸發 ---
     const isAnimating = isCrying || dropQueue.length > 0 || tabletQueue.length > 0 || drops.length > 0 || inkTrails.length > 0;
     
     if (wasActive && !isAnimating) {
@@ -303,7 +310,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       if (currentGemScale < 0.01) gemContainer.visible = false;
     }
     
-    // 【致命錯誤修復】：確保 scale.set 寫在 if/else 之外，寶石才能正常縮放顯示！
     gemContainer.scale.set(currentGemScale); 
   });
 

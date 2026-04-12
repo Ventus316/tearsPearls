@@ -51,9 +51,10 @@ export const TRAIL_BLUR_INCREASE_RATE = 0.2;
 export const TRAIL_GRAVITY_MULTIPLIER = 0.6;
 
 // ==========================================
-// ✨ 寶石匯聚動畫參數 (已解耦)
+// ✨ 寶石匯聚動畫參數 (與寶石視覺位置徹底解耦)
 // ==========================================
-export const CONVERGE_SPEED_MOVE = 0.01;  // 飛向寶石中心的速度 (數字越小，吸過去的軌跡越滑順)
-export const CONVERGE_FADE_DISTANCE = -100; // 距離寶石多近(px)時才開始透明化 (解決半空消失的問題)
-export const CONVERGE_SPEED_ALPHA = 0.96; // 透明化的速度
-export const CONVERGE_SPEED_SCALE = 0.99; // 縮小的速度
+export const CONVERGE_SPEED_MOVE = 0.01;    // 飛向底部的速度 (越小越平滑)
+export const CONVERGE_SPEED_ALPHA = 0.92;   // 變透明的速度 (0.8~0.99)
+export const CONVERGE_SPEED_SCALE = 0.97;   // 縮小的速度
+export const CONVERGE_BOTTOM_OFFSET = 30;   // 【調整點】匯聚中心距離平板底部的距離 (px)
+export const CONVERGE_FADE_HEIGHT = 150;    // 【調整點】文字距離平板底部多少(px)時，才開始透明與縮小
