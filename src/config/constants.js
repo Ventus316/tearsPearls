@@ -1,6 +1,5 @@
 // src/config/constants.js
 
-// 更新為使用者要求的 20 個詞組
 export const WORDS = [
   '孤單', '想念', '失去', '委屈', '責任', 
   '焦慮', '壓力', '自責', '沒事', '還好', 
@@ -61,4 +60,15 @@ export const CONVERGE_SPEED_MOVE = 0.01;
 export const CONVERGE_SPEED_ALPHA = 0.92;   
 export const CONVERGE_SPEED_SCALE = 0.97;   
 export const CONVERGE_BOTTOM_OFFSET = 30;   
-export const CONVERGE_FADE_HEIGHT = 150;
+export const CONVERGE_FADE_HEIGHT = 150;    
+
+// ==========================================
+// ✨ 寶石與情緒對應字典 (心理測驗分類)
+// ==========================================
+export const GEM_MAPPING = {
+  pearl: ['孤單', '想念', '失去', '委屈'],         // 珍珠：悲傷與失落
+  diamond: ['責任', '焦慮', '壓力', '自責'],       // 鑽石：重擔與自我要求
+  quartz: ['沒事', '還好', '無力', '有點累'],       // 白水晶：疲憊與壓抑
+  opal: ['說不出口', '後悔', '怎麼辦', '捨不得'],  // 蛋白石：迷惘與糾結
+  lapis: ['面子', '期待', '別丟臉', '不能示弱']    // 青金石：武裝與自尊
+};
