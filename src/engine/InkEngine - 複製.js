@@ -10,7 +10,7 @@ import {
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER
 } from '../config/constants';
 
-export function createInkEngine(containerElement, getEyeData) {
+export function createInkEngine(containerElement) {
   const app = new window.PIXI.Application({
     width: 400,
     height: TOTAL_H, 
@@ -96,31 +96,23 @@ export function createInkEngine(containerElement, getEyeData) {
   const spawnWordFlow = (isInner = Math.random() > 0.5, sizeScale = 1.0) => {
     const word = WORDS[Math.floor(Math.random() * WORDS.length)];
     const chars = word.split('');
-    const isLeftEye = Math.random() > 0.5; 
+    const isLeftEye = Math.random() > 0.5;
     
-    const eyeData = getEyeData(); 
+    const baseEyeX = isLeftEye ? app.screen.width * 0.3 : app.screen.width * 0.7;
+    const eyeOffset = EYE_OFFSET; 
     
-    let eyeX, eyeY;
-
-    if (eyeData) {
-      if (isLeftEye) {
-         eyeX = isInner ? eyeData.leftInner.x : eyeData.leftOuter.x;
-         eyeY = isInner ? eyeData.leftInner.y : eyeData.leftOuter.y;
-      } else {
-         eyeX = isInner ? eyeData.rightInner.x : eyeData.rightOuter.x;
-         eyeY = isInner ? eyeData.rightInner.y : eyeData.rightOuter.y;
-      }
+    let eyeX = baseEyeX;
+    if (isLeftEye) {
+      eyeX += isInner ? eyeOffset : -eyeOffset;
     } else {
-      const baseEyeX = app.screen.width * (isLeftEye ? 0.3 : 0.7);
-      eyeX = baseEyeX + (isInner ? EYE_OFFSET : -EYE_OFFSET);
-      eyeY = 60; 
+      eyeX += isInner ? -eyeOffset : eyeOffset;
     }
     
     chars.forEach((char, index) => {
       dropQueue.push({
         char: char,
         x: eyeX + (Math.random() - 0.5) * (8 * sizeScale), 
-        y: eyeY, 
+        y: 40, 
         triggerFrame: frameCounter + (index * WORD_SPAWN_INTERVAL), 
         scale: sizeScale 
       });
@@ -182,6 +174,7 @@ export function createInkEngine(containerElement, getEyeData) {
         const sizeScale = 0.4 + Math.sin(p * Math.PI) * 0.6;
         spawnWordFlow(isInner, sizeScale);
       }
+
       if (p === 1) isCrying = false; 
     }
 
@@ -219,8 +212,10 @@ export function createInkEngine(containerElement, getEyeData) {
       let targetAlpha = 1;
       if (depthRatio > FADE_START_RATIO) {
           const fadeProgress = Math.min((depthRatio - FADE_START_RATIO) / (FADE_END_RATIO - FADE_START_RATIO), 1);
+          // 使用常數換算最低透明度，例如 MIN_ALPHA = 0.9，則公式等同 1 - (0.1 * fadeProgress)
           targetAlpha = 1 - ((1 - MIN_ALPHA) * fadeProgress);
       }
+      
       drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * ALPHA_EASE;
 
       const triggerDist = Math.max(3, TRAIL_SPAWN_DENSITY * drop.baseScale); 
@@ -241,7 +236,9 @@ export function createInkEngine(containerElement, getEyeData) {
         const trailBlur = new window.PIXI.BlurFilter();
         trailBlur.blur = depthRatio * TRAIL_INITIAL_BLUR_MULTIPLIER; 
         trail.filters = [trailBlur];
+        
         trail.alpha = TRAIL_BASE_ALPHA + (depthRatio * TRAIL_DEPTH_ALPHA_MULTIPLIER); 
+        
         trailContainer.addChildAt(trail, 0);
 
         inkTrails.push({
@@ -275,14 +272,18 @@ export function createInkEngine(containerElement, getEyeData) {
 
     for (let i = inkTrails.length - 1; i >= 0; i--) {
       const trail = inkTrails[i];
+      
       trail.sprite.scale.x += trail.scaleSpeedX * delta;
       trail.sprite.scale.y += trail.scaleSpeedY * delta;
       trail.sprite.alpha -= trail.alphaSpeed * delta;
       trail.sprite.y += trail.vy * delta;
       
-      if (trail.blurFilter) trail.blurFilter.blur += TRAIL_BLUR_INCREASE_RATE * delta;
+      if (trail.blurFilter) {
+        trail.blurFilter.blur += TRAIL_BLUR_INCREASE_RATE * delta;
+      }
 
       const trailBottom = trail.screen === 1 ? MONITOR_H : TOTAL_H;
+      
       if (trail.sprite.alpha <= 0.01 || trail.sprite.y > trailBottom) {
         trailContainer.removeChild(trail.sprite);
         trail.sprite.destroy();
@@ -294,6 +295,8 @@ export function createInkEngine(containerElement, getEyeData) {
   return {
     spawnWord,
     triggerCryingSequence,
-    destroy: () => app.destroy(true, { children: true, texture: true, baseTexture: true })
+    destroy: () => {
+      app.destroy(true, { children: true, texture: true, baseTexture: true });
+    }
   };
 }
