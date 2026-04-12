@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { TOTAL_H, MONITOR_H, TABLET_START_Y, TABLET_H } from './config/constants';
+// 【微調1】: 多引入 GAP_H 用來畫初始畫面的縫隙
+import { TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
 import { createInkEngine } from './engine/InkEngine';
 
 export default function App() {
@@ -17,7 +18,6 @@ export default function App() {
       if (!window.PIXI) {
         await new Promise((resolve) => {
           const script = document.createElement('script');
-          // 【防呆修復】：切斷網址字串，防止被轉為隱藏超連結
           script.src = ['https:/', '/cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js'].join('');
           script.onload = resolve;
           document.body.appendChild(script);
@@ -58,7 +58,6 @@ export default function App() {
 
     let faceLandmarker;
     try {
-      // 【終極防呆修復】：把所有網址拆成陣列再組合，徹底防止複製時網址被破壞，解決 fetch URL 報錯！
       const mpBase = ['https:/', '/cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3'].join('');
       const modelBase = ['https:/', '/storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'].join('');
 
@@ -134,7 +133,6 @@ export default function App() {
     loop();
   };
 
-  // 點擊事件：切換狀態並叫引擎做事
   const handleSpawnWord = () => {
     setInteractionState('playing');
     if (engineRef.current) engineRef.current.spawnWord();
@@ -157,15 +155,22 @@ export default function App() {
 
       <div className="relative rounded-sm shadow-2xl border-4 border-[#111315] overflow-hidden bg-[#E8E4D9]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
         
+        {/* 【微調2】：靜態實體機台背景 (在 PIXI 載入前，提供完美的顯示器與縫隙視覺結構) */}
+        <div className="absolute inset-0 flex flex-col pointer-events-none z-0">
+          <div style={{ height: `${MONITOR_H}px` }} className="w-full bg-[#111315]"></div> {/* 顯示器黑畫面 */}
+          <div style={{ height: `${GAP_H}px` }} className="w-full bg-[#1A1C20]"></div>     {/* 實體縫隙 */}
+          <div style={{ height: `${TABLET_H}px` }} className="w-full bg-[#E8E4D9]"></div> {/* 平板區域 */}
+        </div>
+
         {/* 隱藏的攝影機串流，僅供底層取用 */}
         <video ref={videoRef} playsInline muted autoPlay style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
 
-        {/* PIXI 畫布 */}
-        <div ref={pixiContainer} className="absolute inset-0" />
+        {/* PIXI 畫布 (加上 z-10，啟動後 PIXI 會完美蓋在上方靜態背景之上) */}
+        <div ref={pixiContainer} className="absolute inset-0 z-10" />
 
-        {/* 實體平板上的 UI 介面層 (精準疊加在 Tablet 區域中心) */}
+        {/* 實體平板上的 UI 介面層 (加上 z-20 確保 UI 永遠在最上層) */}
         <div 
-          className="absolute left-0 w-full flex items-center justify-center pointer-events-none"
+          className="absolute left-0 w-full flex items-center justify-center pointer-events-none z-20"
           style={{ top: `${TABLET_START_Y}px`, height: `${TABLET_H}px` }}
         >
           {interactionState !== 'playing' && (
