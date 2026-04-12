@@ -1,6 +1,6 @@
 // src/engine/InkEngine.js
 import { 
-  WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, VIRTUAL_H, 
+  WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_H, TABLET_START_Y, VIRTUAL_H, 
   CRYING_DURATION, BG_COLOR, TEXT_COLOR, BEZEL_COLOR, FONT_FAMILY, FONT_SIZE_BASE,
   NETWORK_DELAY_FRAMES, DISPLACEMENT_STRENGTH, WATER_SPEED_Y, WATER_SPEED_X,
   EYE_OFFSET, WORD_SPAWN_INTERVAL, BASE_VELOCITY_X, SWAY_FREQUENCY, SWAY_AMPLITUDE,
@@ -10,8 +10,12 @@ import {
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER
 } from '../config/constants';
 
-export function createInkEngine(containerElement, getEyeData) {
-  const app = new window.PIXI.Application({
+
+// =========================================================================
+// 📂 檔案二：本機端的 src/engine/InkEngine.js
+// =========================================================================
+export function createInkEngine(containerElement, getEyeData, videoElement) {
+    const app = new window.PIXI.Application({
     width: 400,
     height: TOTAL_H, 
     backgroundColor: BG_COLOR,
@@ -21,47 +25,69 @@ export function createInkEngine(containerElement, getEyeData) {
   
   containerElement.appendChild(app.view);
 
+  // --- 1. 預渲染文字 ---
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
-  
   uniqueChars.forEach(char => {
     const textGraphic = new window.PIXI.Text(char, {
-      fontFamily: FONT_FAMILY, 
-      fontSize: FONT_SIZE_BASE,    
-      fill: TEXT_COLOR,  
-      fontWeight: 'bold',
+      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: TEXT_COLOR, fontWeight: 'bold',
     });
     charTextures[char] = app.renderer.generateTexture(textGraphic);
     textGraphic.destroy();
   });
 
+  // --- 2. 攝影機背景圖層 (僅限顯示器區域) ---
+  const videoBaseTexture = new window.PIXI.BaseTexture(videoElement);
+  const videoTexture = new window.PIXI.Texture(videoBaseTexture);
+  const videoSprite = new window.PIXI.Sprite(videoTexture);
+  
+  const videoContainer = new window.PIXI.Container();
+  videoSprite.anchor.set(0.5);
+  videoContainer.addChild(videoSprite);
+
+  // 加上遮罩，確保攝影機畫面「絕對不會」流到平板區
+  const monitorMask = new window.PIXI.Graphics();
+  monitorMask.beginFill(0xFFFFFF);
+  monitorMask.drawRect(0, 0, 400, MONITOR_H);
+  monitorMask.endFill();
+  videoContainer.mask = monitorMask;
+
+  app.stage.addChildAt(videoContainer, 0); 
+  app.stage.addChildAt(monitorMask, 0);
+
+  // --- 3. 平板區專屬底色 ---
+  const tabletBg = new window.PIXI.Graphics();
+  tabletBg.beginFill(BG_COLOR);
+  tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); // 這裡就不會報錯了！
+  tabletBg.endFill();
+  app.stage.addChildAt(tabletBg, 1); 
+
+  // --- 4. 水波紋理與扭曲 ---
   const svgNoise = `
     <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-      <filter id="noise">
-        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" stitchTiles="stitch" />
-      </filter>
+      <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" stitchTiles="stitch" /></filter>
       <rect width="100%" height="100%" filter="url(#noise)" />
     </svg>
   `;
   const noiseUrl = `data:image/svg+xml;base64,${btoa(svgNoise)}`;
   const noiseTexture = window.PIXI.Texture.from(noiseUrl);
-  
   const waterSprite = new window.PIXI.TilingSprite(noiseTexture, app.screen.width, app.screen.height);
+  
+  waterSprite.alpha = 0.15; // 透明度讓底下的攝影機可見
   app.stage.addChild(waterSprite);
 
   const masterContainer = new window.PIXI.Container();
   const displacementFilter = new window.PIXI.DisplacementFilter(waterSprite);
   displacementFilter.scale.set(DISPLACEMENT_STRENGTH); 
-  
   masterContainer.filters = [displacementFilter];
   app.stage.addChild(masterContainer);
 
   const trailContainer = new window.PIXI.Container();
   masterContainer.addChild(trailContainer);
-
   const textContainer = new window.PIXI.Container();
   masterContainer.addChild(textContainer);
 
+  // --- 5. 實體縫隙遮罩 ---
   const bezelContainer = new window.PIXI.Container();
   app.stage.addChild(bezelContainer);
 
@@ -72,22 +98,17 @@ export function createInkEngine(containerElement, getEyeData) {
   bezelContainer.addChild(bezel);
 
   const delayText = new window.PIXI.Text("網路傳輸延遲中 (2 秒)...", {
-      fontFamily: 'sans-serif',
-      fontSize: 12,
-      fill: 0x666666,
-      align: 'center',
-      letterSpacing: 2
+      fontFamily: 'sans-serif', fontSize: 12, fill: 0x666666, align: 'center', letterSpacing: 2
   });
   delayText.anchor.set(0.5);
-  delayText.x = 200;
-  delayText.y = MONITOR_H + (GAP_H / 2); 
+  delayText.position.set(200, MONITOR_H + (GAP_H / 2));
   bezelContainer.addChild(delayText);
 
+  // --- 6. 變數與狀態 ---
   const drops = [];
   const inkTrails = [];
   const dropQueue = [];
   const tabletQueue = []; 
-  
   let frameCounter = 0; 
   let isCrying = false;
   let cryingTime = 0;
@@ -97,7 +118,6 @@ export function createInkEngine(containerElement, getEyeData) {
     const word = WORDS[Math.floor(Math.random() * WORDS.length)];
     const chars = word.split('');
     const isLeftEye = Math.random() > 0.5; 
-    
     const eyeData = getEyeData(); 
     
     let eyeX, eyeY;
@@ -113,7 +133,7 @@ export function createInkEngine(containerElement, getEyeData) {
     } else {
       const baseEyeX = app.screen.width * (isLeftEye ? 0.3 : 0.7);
       eyeX = baseEyeX + (isInner ? EYE_OFFSET : -EYE_OFFSET);
-      eyeY = 60; 
+      eyeY = 150; 
     }
     
     chars.forEach((char, index) => {
@@ -130,10 +150,8 @@ export function createInkEngine(containerElement, getEyeData) {
   const spawnSingleChar = (char, startX, startY, scale, screen = 1, prevVx = null, prevVy = null) => {
     const drop = new window.PIXI.Sprite(charTextures[char]);
     drop.anchor.set(0.5);
-    drop.x = startX; 
-    drop.y = startY;
+    drop.position.set(startX, startY);
     drop.alpha = 1;
-    
     drop.baseScale = scale;
     drop.scale.set(scale);
     
@@ -144,43 +162,35 @@ export function createInkEngine(containerElement, getEyeData) {
     textContainer.addChild(drop);
 
     drops.push({
-      sprite: drop,
-      char: char,
-      blur: blurFilter,
-      baseScale: scale, 
+      sprite: drop, char: char, blur: blurFilter, baseScale: scale, 
       vx: prevVx !== null ? prevVx : (Math.random() - 0.5) * BASE_VELOCITY_X, 
       vy: prevVy !== null ? prevVy : (Math.random() * 0.1 + 2.0) * (0.8 + scale * 0.2), 
-      life: 0,
-      lastTrailY: startY,
-      screen: screen 
+      life: 0, lastTrailY: startY, screen: screen 
     });
-  };
-
-  const spawnWord = () => spawnWordFlow(Math.random() > 0.5, 0.8);
-
-  const triggerCryingSequence = () => {
-    if(isCrying) return;
-    isCrying = true;
-    cryingTime = 0;
-    wordSpawnTimer = 0;
   };
 
   app.ticker.add((delta) => {
     frameCounter += delta;
 
+    // 動態計算攝影機比例，只填滿上半部 MONITOR_H
+    if (videoElement.videoWidth > 0) {
+       const vw = videoElement.videoWidth;
+       const vh = videoElement.videoHeight;
+       const scale = Math.max(400 / vw, MONITOR_H / vh);
+       videoSprite.scale.set(scale);
+       videoSprite.scale.x *= -1; // 鏡像
+       videoSprite.position.set(200, MONITOR_H / 2); 
+    }
+
     if (isCrying) {
       cryingTime += delta * 16.66; 
       const p = Math.min(cryingTime / CRYING_DURATION, 1); 
-
-      const currentInterval = 1200 - Math.sin(p * Math.PI) * 800; 
-      const framesPerWord = currentInterval / 16.66;
+      const framesPerWord = (1200 - Math.sin(p * Math.PI) * 800) / 16.66;
 
       wordSpawnTimer += delta;
       if (wordSpawnTimer >= framesPerWord) {
         wordSpawnTimer = 0;
-        const isInner = Math.random() < (1 - p);
-        const sizeScale = 0.4 + Math.sin(p * Math.PI) * 0.6;
-        spawnWordFlow(isInner, sizeScale);
+        spawnWordFlow(Math.random() < (1 - p), 0.4 + Math.sin(p * Math.PI) * 0.6);
       }
       if (p === 1) isCrying = false; 
     }
@@ -216,27 +226,18 @@ export function createInkEngine(containerElement, getEyeData) {
       const blurDepth = Math.min(depthRatio, FADE_END_RATIO);
       drop.blur.blur = Math.max(0, (blurDepth - BLUR_START_RATIO) * BLUR_MULTIPLIER);
 
-      let targetAlpha = 1;
       if (depthRatio > FADE_START_RATIO) {
           const fadeProgress = Math.min((depthRatio - FADE_START_RATIO) / (FADE_END_RATIO - FADE_START_RATIO), 1);
-          targetAlpha = 1 - ((1 - MIN_ALPHA) * fadeProgress);
+          drop.sprite.alpha += ((1 - ((1 - MIN_ALPHA) * fadeProgress)) - drop.sprite.alpha) * ALPHA_EASE;
       }
-      drop.sprite.alpha += (targetAlpha - drop.sprite.alpha) * ALPHA_EASE;
 
-      const triggerDist = Math.max(3, TRAIL_SPAWN_DENSITY * drop.baseScale); 
-      const distMoved = drop.sprite.y - drop.lastTrailY;
-      
-      if (distMoved >= triggerDist && depthRatio > TRAIL_START_DEPTH) {
+      if ((drop.sprite.y - drop.lastTrailY) >= Math.max(3, TRAIL_SPAWN_DENSITY * drop.baseScale) && depthRatio > TRAIL_START_DEPTH) {
         drop.lastTrailY = drop.sprite.y;
-        
         const trail = new window.PIXI.Sprite(charTextures[drop.char]);
         trail.anchor.set(0.5);
-        trail.x = drop.sprite.x;
-        trail.y = drop.sprite.y;
+        trail.position.set(drop.sprite.x, drop.sprite.y);
         trail.rotation = Math.random() * 0.2 - 0.1; 
-        
-        trail.scale.y = TRAIL_SCALE_Y * drop.baseScale; 
-        trail.scale.x = (TRAIL_SCALE_X_BASE + (depthRatio * TRAIL_SCALE_X_DEPTH_MULTIPLIER)) * drop.baseScale; 
+        trail.scale.set((TRAIL_SCALE_X_BASE + (depthRatio * TRAIL_SCALE_X_DEPTH_MULTIPLIER)) * drop.baseScale, TRAIL_SCALE_Y * drop.baseScale); 
         
         const trailBlur = new window.PIXI.BlurFilter();
         trailBlur.blur = depthRatio * TRAIL_INITIAL_BLUR_MULTIPLIER; 
@@ -245,13 +246,10 @@ export function createInkEngine(containerElement, getEyeData) {
         trailContainer.addChildAt(trail, 0);
 
         inkTrails.push({
-          sprite: trail,
-          blurFilter: trailBlur, 
-          scaleSpeedX: 0.008 + (Math.random() * 0.005), 
-          scaleSpeedY: TRAIL_EXPAND_SPEED_Y,                           
+          sprite: trail, blurFilter: trailBlur, 
+          scaleSpeedX: 0.008 + (Math.random() * 0.005), scaleSpeedY: TRAIL_EXPAND_SPEED_Y,                           
           alphaSpeed: (0.015 + (Math.random() * 0.01)) / Math.max(0.6, drop.baseScale),  
-          vy: drop.vy * TRAIL_GRAVITY_MULTIPLIER,
-          screen: drop.screen
+          vy: drop.vy * TRAIL_GRAVITY_MULTIPLIER, screen: drop.screen
         });
       }
 
@@ -259,12 +257,8 @@ export function createInkEngine(containerElement, getEyeData) {
       if (drop.sprite.y > screenBottom) {
           if (drop.screen === 1) {
               tabletQueue.push({
-                  char: drop.char,
-                  x: drop.sprite.x,
-                  scale: drop.baseScale, 
-                  vx: drop.vx,
-                  vy: drop.vy,
-                  triggerFrame: frameCounter + NETWORK_DELAY_FRAMES 
+                  char: drop.char, x: drop.sprite.x, scale: drop.baseScale, 
+                  vx: drop.vx, vy: drop.vy, triggerFrame: frameCounter + NETWORK_DELAY_FRAMES 
               });
           }
           textContainer.removeChild(drop.sprite);
@@ -279,7 +273,6 @@ export function createInkEngine(containerElement, getEyeData) {
       trail.sprite.scale.y += trail.scaleSpeedY * delta;
       trail.sprite.alpha -= trail.alphaSpeed * delta;
       trail.sprite.y += trail.vy * delta;
-      
       if (trail.blurFilter) trail.blurFilter.blur += TRAIL_BLUR_INCREASE_RATE * delta;
 
       const trailBottom = trail.screen === 1 ? MONITOR_H : TOTAL_H;
@@ -292,8 +285,8 @@ export function createInkEngine(containerElement, getEyeData) {
   });
 
   return {
-    spawnWord,
-    triggerCryingSequence,
+    spawnWord: () => spawnWordFlow(Math.random() > 0.5, 0.8),
+    triggerCryingSequence: () => { if(!isCrying) { isCrying = true; cryingTime = 0; wordSpawnTimer = 0; } },
     destroy: () => app.destroy(true, { children: true, texture: true, baseTexture: true })
   };
 }
