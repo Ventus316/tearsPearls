@@ -24,7 +24,7 @@ export const FONT_SIZE_BASE = 24;
 export const TEXT_STROKE_WIDTH = 1; 
 
 export const CRYING_DURATION = 10000; 
-export const NETWORK_DELAY_FRAMES = 120; 
+export const NETWORK_DELAY_FRAMES = 60; 
 
 export const DISPLACEMENT_STRENGTH = 12; 
 export const WATER_SPEED_Y = 1.5; 

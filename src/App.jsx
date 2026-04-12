@@ -92,7 +92,7 @@ export default function App() {
   return (
     <div className="flex flex-col items-center py-6 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
       <div className="mb-4 text-center px-4">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">0.7.6：自選情緒結晶版</h1>
+        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">Tears & Pearls</h1>
       </div>
 
       <div className="relative rounded-sm shadow-2xl border-4 border-[#111315] overflow-hidden bg-[#E8E4D9]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
