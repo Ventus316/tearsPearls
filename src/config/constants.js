@@ -1,6 +1,13 @@
 // src/config/constants.js
 
-export const WORDS = ['焦慮', '壓力', '自責', '委屈', '孤單', '沒事', '怎辦', '想念'];
+// 更新為使用者要求的 20 個詞組
+export const WORDS = [
+  '孤單', '想念', '失去', '委屈', '責任', 
+  '焦慮', '壓力', '自責', '沒事', '還好', 
+  '無力', '有點累', '說不出口', '後悔', '怎麼辦', 
+  '捨不得', '面子', '期待', '別丟臉', '不能示弱'
+];
+
 export const MONITOR_H = 700; 
 export const GAP_H = 50;      
 export const TABLET_H = 400;  
@@ -15,7 +22,7 @@ export const BEZEL_COLOR = 0x1A1C20;
 
 export const FONT_FAMILY = '"PingFang TC", "STKaiti", "KaiTi", serif';
 export const FONT_SIZE_BASE = 24;    
-export const TEXT_STROKE_WIDTH = 1; // 白邊粗細 (px)
+export const TEXT_STROKE_WIDTH = 1; 
 
 export const CRYING_DURATION = 10000; 
 export const NETWORK_DELAY_FRAMES = 120; 
@@ -50,11 +57,8 @@ export const TRAIL_EXPAND_SPEED_Y = 0.002;
 export const TRAIL_BLUR_INCREASE_RATE = 0.2; 
 export const TRAIL_GRAVITY_MULTIPLIER = 0.6;
 
-// ==========================================
-// ✨ 寶石匯聚動畫參數 (與寶石視覺位置徹底解耦)
-// ==========================================
-export const CONVERGE_SPEED_MOVE = 0.01;    // 飛向底部的速度 (越小越平滑)
-export const CONVERGE_SPEED_ALPHA = 0.92;   // 變透明的速度 (0.8~0.99)
-export const CONVERGE_SPEED_SCALE = 0.97;   // 縮小的速度
-export const CONVERGE_BOTTOM_OFFSET = 30;   // 【調整點】匯聚中心距離平板底部的距離 (px)
-export const CONVERGE_FADE_HEIGHT = 150;    // 【調整點】文字距離平板底部多少(px)時，才開始透明與縮小
+export const CONVERGE_SPEED_MOVE = 0.01;    
+export const CONVERGE_SPEED_ALPHA = 0.92;   
+export const CONVERGE_SPEED_SCALE = 0.97;   
+export const CONVERGE_BOTTOM_OFFSET = 30;   
+export const CONVERGE_FADE_HEIGHT = 150;
