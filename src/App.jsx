@@ -10,15 +10,22 @@ export default function App() {
   const eyeCoordsRef = useRef(null);
   
   const [interactionState, setInteractionState] = useState('init');
-  const [selectedWords, setSelectedWords] = useState([]); // 儲存選中的 5 個詞
+  const [selectedWords, setSelectedWords] = useState([]);
 
   useEffect(() => {
     const initPixiScript = async () => {
       if (!window.PIXI) {
+        // 第一步：載入 PIXI 主程式
         await new Promise((resolve) => {
           const script = document.createElement('script');
           script.src = ['https:/', '/cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js'].join('');
-          script.onload = resolve;
+          script.onload = async () => {
+            // 第二步：PIXI 載入完成後，載入 pixi-filters 擴充包 (提供 Bloom 等高級濾鏡)
+            const filterScript = document.createElement('script');
+            filterScript.src = ['https:/', '/cdn.jsdelivr.net/npm/pixi-filters@5.2.1/dist/pixi-filters.js'].join('');
+            filterScript.onload = resolve;
+            document.body.appendChild(filterScript);
+          };
           document.body.appendChild(script);
         });
       }
@@ -39,6 +46,7 @@ export default function App() {
     } catch (err) { alert("請允許相機權限！"); setInteractionState('init'); return; }
 
     try {
+      // 確保使用陣列 join 組合網址
       const mpBase = ['https:/', '/cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3'].join('');
       const modelBase = ['https:/', '/storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'].join('');
       const visionModule = await import(/* @vite-ignore */ mpBase + '/vision_bundle.mjs');
@@ -76,7 +84,6 @@ export default function App() {
     loop();
   };
 
-  // 詞組選擇邏輯
   const toggleWord = (word) => {
     if (selectedWords.includes(word)) {
       setSelectedWords(selectedWords.filter(w => w !== word));
@@ -90,46 +97,50 @@ export default function App() {
   const handleTryAgain = () => { setInteractionState('ready'); setSelectedWords([]); };
 
   return (
-    <div className="flex flex-col items-center py-6 min-h-screen bg-[#2A2B2E] text-[#E8E4D9] font-sans">
-      <div className="mb-4 text-center px-4">
-        <h1 className="text-2xl font-bold mb-2 tracking-widest text-amber-100">Tears & Pearls</h1>
+    // ✨ 背景改為極致深邃的黑 #0a0a0c，讓光暈完全凸顯
+    <div className="flex flex-col items-center py-6 min-h-screen bg-[#0a0a0c] text-[#E8E4D9] font-sans">
+      
+      {/* ✨ 高級感標題設計：增加字距 tracking */}
+      <div className="mb-6 text-center px-4">
+        <h1 className="text-3xl font-extralight mb-1 tracking-[0.4em] text-white">AFTER FALLING</h1>
+        <p className="text-[10px] tracking-[0.6em] text-amber-200/50 uppercase">The Alchemy of Tears</p>
       </div>
 
-      <div className="relative rounded-sm shadow-2xl border-4 border-[#111315] overflow-hidden bg-[#E8E4D9]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
+      <div className="relative rounded-sm shadow-[0_0_50px_rgba(255,255,255,0.05)] border-4 border-[#111315] overflow-hidden bg-[#0a0a0c]" style={{ width: '400px', height: `${TOTAL_H}px` }}>
         <div className="absolute inset-0 flex flex-col pointer-events-none z-0">
           <div style={{ height: `${MONITOR_H}px` }} className="w-full bg-[#111315]"></div> 
           <div style={{ height: `${GAP_H}px` }} className="w-full bg-[#1A1C20]"></div>     
-          <div style={{ height: `${TABLET_H}px` }} className="w-full bg-[#E8E4D9]"></div> 
+          <div style={{ height: `${TABLET_H}px` }} className="w-full bg-[#0a0a0c]"></div> 
         </div>
 
         <video ref={videoRef} playsInline muted autoPlay style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
         <div ref={pixiContainer} className="absolute inset-0 z-10" />
 
         <div className="absolute left-0 w-full flex justify-center pointer-events-none z-20" style={{ top: `${TABLET_START_Y + 20}px` }}>
-          <div className={`pointer-events-auto transition-opacity duration-700 ${interactionState === 'playing' ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+          <div className={`pointer-events-auto transition-all duration-1000 ${interactionState === 'playing' ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
             
             {interactionState === 'init' && (
-              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/90 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[340px]">
-                <button onClick={initCameraAndAI} className="w-full px-8 py-4 bg-[#1d4ed8] hover:bg-blue-600 rounded-full font-bold shadow-lg text-white text-lg tracking-widest transition-transform active:scale-95">啟動鏡頭與 AI</button>
+              <div className="flex flex-col items-center gap-4 bg-white/5 backdrop-blur-xl border border-white/10 px-10 py-8 rounded-3xl shadow-2xl w-[340px]">
+                <button onClick={initCameraAndAI} className="w-full px-8 py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full font-light shadow-lg text-white text-lg tracking-widest transition-all active:scale-95">啟動鏡頭與 AI</button>
               </div>
             )}
             
             {interactionState === 'ready' && (
-              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/90 backdrop-blur-md px-6 py-6 rounded-3xl border border-gray-700 shadow-2xl w-[360px]">
-                <p className="text-gray-300 text-xs font-light tracking-widest mb-1">
-                  請選擇 5 個目前的心理狀態 ({selectedWords.length}/5)
+              // ✨ 玻璃擬態 (Glassmorphism) 選單
+              <div className="flex flex-col items-center gap-4 bg-white/5 backdrop-blur-xl border border-white/10 px-6 py-6 rounded-3xl shadow-[0_20px_40px_rgba(0,0,0,0.5)] w-[360px]">
+                <p className="text-gray-300 text-[11px] font-light tracking-[0.2em] mb-1 opacity-70">
+                  請選擇 5 個心理狀態 ({selectedWords.length}/5)
                 </p>
                 
-                {/* 詞組選擇網格 */}
                 <div className="grid grid-cols-4 gap-2 w-full">
                   {WORDS.map(word => (
                     <button
                       key={word}
                       onClick={() => toggleWord(word)}
-                      className={`py-1 text-[10px] rounded-full border transition-all ${
+                      className={`py-1 text-[10px] rounded-full transition-all duration-300 ${
                         selectedWords.includes(word) 
-                        ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(37,99,235,0.6)]' 
-                        : 'bg-[#2A2B2E] border-gray-600 text-gray-400'
+                        ? 'bg-blue-500/80 text-white shadow-[0_0_15px_rgba(59,130,246,0.6)] border border-blue-300' 
+                        : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
                       }`}
                     >
                       {word}
@@ -139,17 +150,17 @@ export default function App() {
 
                 {selectedWords.length === 5 && (
                   <div className="flex gap-2 w-full mt-2 animate-in fade-in slide-in-from-bottom-2">
-                    <button onClick={handleSpawnWord} className="flex-1 py-2 bg-[#2A2B2E] hover:bg-[#3f3f46] rounded-full border border-gray-500 text-white text-xs tracking-wider transition-transform active:scale-95">流出單一詞彙</button>
-                    <button onClick={handleCrying} className="flex-1 py-2 bg-[#c2410c] hover:bg-[#9a3412] rounded-full shadow-lg text-white text-xs font-bold tracking-wider transition-transform active:scale-95">情緒崩潰</button>
+                    <button onClick={handleSpawnWord} className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-full text-white/80 text-xs tracking-wider transition-transform active:scale-95">單一淚滴</button>
+                    <button onClick={handleCrying} className="flex-1 py-2 bg-gradient-to-r from-amber-600/80 to-red-600/80 border border-red-400/50 hover:opacity-90 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.4)] text-white text-xs font-light tracking-wider transition-transform active:scale-95">情緒宣洩</button>
                   </div>
                 )}
               </div>
             )}
 
             {interactionState === 'finished' && (
-              <div className="flex flex-col items-center gap-4 bg-[#1A1C20]/90 backdrop-blur-md px-10 py-8 rounded-3xl border border-gray-700 shadow-2xl w-[300px]">
-                <p className="text-gray-300 text-sm font-light tracking-widest">情緒已宣洩完畢</p>
-                <button onClick={handleTryAgain} className="w-full px-10 py-3 bg-emerald-700 hover:bg-emerald-600 rounded-full font-bold shadow-lg text-white tracking-widest text-lg transition-transform active:scale-95">再次體驗</button>
+              <div className="flex flex-col items-center gap-4 bg-white/5 backdrop-blur-xl border border-white/10 px-10 py-8 rounded-3xl shadow-2xl w-[300px]">
+                <p className="text-gray-300 text-sm font-light tracking-[0.2em]">情緒已結晶</p>
+                <button onClick={handleTryAgain} className="w-full px-10 py-3 bg-white/10 hover:bg-white/20 border border-white/30 rounded-full font-light shadow-lg text-white tracking-widest text-lg transition-transform active:scale-95">再次體驗</button>
               </div>
             )}
 

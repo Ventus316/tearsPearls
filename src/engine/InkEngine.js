@@ -9,20 +9,22 @@ import {
   TRAIL_SCALE_X_DEPTH_MULTIPLIER, TRAIL_INITIAL_BLUR_MULTIPLIER, TRAIL_BASE_ALPHA, 
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER,
   CONVERGE_SPEED_MOVE, CONVERGE_SPEED_ALPHA, CONVERGE_SPEED_SCALE, CONVERGE_BOTTOM_OFFSET, CONVERGE_FADE_HEIGHT,
-  GEM_MAPPING // 引入寶石字典
+  GEM_MAPPING
 } from '../config/constants';
 
 export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
+  // 將背景改為黑色，以凸顯發光效果
   const app = new window.PIXI.Application({
-    width: 400, height: TOTAL_H, backgroundColor: BG_COLOR, resolution: window.devicePixelRatio || 1, autoDensity: true,
+    width: 400, height: TOTAL_H, backgroundColor: 0x0a0a0c, resolution: window.devicePixelRatio || 1, autoDensity: true,
   });
   containerElement.appendChild(app.view);
 
+  // 將文字顏色強制改為偏白，產生反差
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
     const textGraphic = new window.PIXI.Text(char, {
-      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: TEXT_COLOR, fontWeight: 'bold', stroke: 0xFFFFFF, strokeThickness: TEXT_STROKE_WIDTH
+      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: 0xFFFFFF, fontWeight: 'bold', stroke: 0x888888, strokeThickness: TEXT_STROKE_WIDTH
     });
     charTextures[char] = app.renderer.generateTexture(textGraphic);
     textGraphic.destroy();
@@ -33,6 +35,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   const videoSprite = new window.PIXI.Sprite(videoTexture);
   const videoContainer = new window.PIXI.Container();
   videoSprite.anchor.set(0.5); videoContainer.addChild(videoSprite);
+  videoSprite.alpha = 0.6; // 稍微調暗鏡頭，營造氣氛
 
   const monitorMask = new window.PIXI.Graphics();
   monitorMask.beginFill(0xFFFFFF); monitorMask.drawRect(0, 0, 400, MONITOR_H); monitorMask.endFill();
@@ -40,7 +43,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   app.stage.addChildAt(videoContainer, 0); app.stage.addChildAt(monitorMask, 0);
 
   const tabletBg = new window.PIXI.Graphics();
-  tabletBg.beginFill(BG_COLOR); tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); tabletBg.endFill();
+  tabletBg.beginFill(0x0a0a0c); tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); tabletBg.endFill();
   app.stage.addChildAt(tabletBg, 1); 
 
   const svgNs = "http://" + "www.w3.org/2000/svg";
@@ -51,7 +54,17 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
   const masterContainer = new window.PIXI.Container();
   const displacementFilter = new window.PIXI.DisplacementFilter(waterSprite);
-  displacementFilter.scale.set(DISPLACEMENT_STRENGTH); masterContainer.filters = [displacementFilter];
+  displacementFilter.scale.set(DISPLACEMENT_STRENGTH); 
+  
+  // ✨ 殺手鐧：加入 Bloom 濾鏡，整體視覺產生擴散光暈
+  let bloomFilter = null;
+  if (window.PIXI.filters && window.PIXI.filters.BloomFilter) {
+    bloomFilter = new window.PIXI.filters.BloomFilter(8); // 參數為發光強度
+    masterContainer.filters = [displacementFilter, bloomFilter];
+  } else {
+    masterContainer.filters = [displacementFilter];
+  }
+  
   app.stage.addChild(masterContainer);
 
   const trailContainer = new window.PIXI.Container(); masterContainer.addChild(trailContainer);
@@ -69,66 +82,77 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   gemContainer.scale.set(0); gemContainer.visible = false;
   masterContainer.addChildAt(gemContainer, 1); 
 
-  let currentGemGlow = null; // 紀錄當前的發光層，用於呼吸動畫
+  let currentGemGlow = null; 
+  let currentGemShine = null; // 紀錄動態反光條
 
-  // --- 🎨 繪製 5 種不同寶石的函式 ---
   const drawGem = (type, container) => {
-    container.removeChildren(); // 清空前一次的寶石
+    container.removeChildren(); 
     const glow = new window.PIXI.Graphics();
     const core = new window.PIXI.Container();
 
+    // 由於背景變暗，將寶石的光暈與核心稍微調亮
     switch(type) {
-      case 'pearl': // ⚪ 珍珠
-        glow.beginFill(0xFFE4E1, 0.5); glow.drawCircle(0, 0, 50); glow.endFill();
-        const p = new window.PIXI.Graphics();
-        p.beginFill(0xFFFAF0); p.drawCircle(0, 0, 35); p.endFill();
-        p.beginFill(0xFFFFFF, 0.8); p.drawCircle(-10, -10, 10); p.endFill(); // 內陰影/亮點
+      case 'pearl': 
+        glow.beginFill(0xFFE4E1, 0.7); glow.drawCircle(0, 0, 50); glow.endFill();
+        const p = new window.PIXI.Graphics(); p.beginFill(0xFFFAF0); p.drawCircle(0, 0, 35); p.endFill();
+        p.beginFill(0xFFFFFF, 0.9); p.drawCircle(-10, -10, 10); p.endFill(); 
         const pb = new window.PIXI.BlurFilter(); pb.blur = 4; p.filters = [pb];
         core.addChild(p); break;
-      case 'diamond': // 💎 鑽石
-        glow.beginFill(0xE0FFFF, 0.5); glow.drawCircle(0, 0, 60); glow.endFill();
+      case 'diamond': 
+        glow.beginFill(0xE0FFFF, 0.7); glow.drawCircle(0, 0, 60); glow.endFill();
         const d = new window.PIXI.Graphics();
-        d.lineStyle(2, 0xFFFFFF, 0.9); d.beginFill(0xF0FFFF, 0.8);
+        d.lineStyle(2, 0xFFFFFF, 1.0); d.beginFill(0xF0FFFF, 0.9);
         d.moveTo(-30, -20); d.lineTo(30, -20); d.lineTo(45, 0); d.lineTo(0, 50); d.lineTo(-45, 0); d.closePath(); d.endFill();
-        d.lineStyle(1.5, 0xFFFFFF, 0.6); // 切割線
+        d.lineStyle(1.5, 0xFFFFFF, 0.8); 
         d.moveTo(-30, -20); d.lineTo(0, 0); d.lineTo(30, -20);
         d.moveTo(-45, 0); d.lineTo(0, 0); d.lineTo(45, 0); d.moveTo(0, 0); d.lineTo(0, 50);
         core.addChild(d); break;
-      case 'quartz': // 🧊 白水晶
-        glow.beginFill(0xF8F8FF, 0.5); glow.drawCircle(0, 0, 60); glow.endFill();
+      case 'quartz': 
+        glow.beginFill(0xF8F8FF, 0.7); glow.drawCircle(0, 0, 60); glow.endFill();
         const q = new window.PIXI.Graphics();
-        q.lineStyle(2, 0xFFFFFF, 0.8);
-        q.beginFill(0xF5F5F5, 0.85); q.moveTo(-15, 20); q.lineTo(-15, -30); q.lineTo(0, -50); q.lineTo(15, -30); q.lineTo(15, 20); q.closePath(); q.endFill();
-        q.beginFill(0xE8E8E8, 0.85); q.moveTo(-25, 20); q.lineTo(-25, -10); q.lineTo(-15, -25); q.lineTo(-5, -10); q.lineTo(-5, 20); q.closePath(); q.endFill();
-        q.beginFill(0xE8E8E8, 0.85); q.moveTo(5, 20); q.lineTo(5, -5); q.lineTo(15, -20); q.lineTo(25, -5); q.lineTo(25, 20); q.closePath(); q.endFill();
+        q.lineStyle(2, 0xFFFFFF, 0.9);
+        q.beginFill(0xFFFFFF, 0.9); q.moveTo(-15, 20); q.lineTo(-15, -30); q.lineTo(0, -50); q.lineTo(15, -30); q.lineTo(15, 20); q.closePath(); q.endFill();
+        q.beginFill(0xF5F5F5, 0.9); q.moveTo(-25, 20); q.lineTo(-25, -10); q.lineTo(-15, -25); q.lineTo(-5, -10); q.lineTo(-5, 20); q.closePath(); q.endFill();
+        q.beginFill(0xF5F5F5, 0.9); q.moveTo(5, 20); q.lineTo(5, -5); q.lineTo(15, -20); q.lineTo(25, -5); q.lineTo(25, 20); q.closePath(); q.endFill();
         core.addChild(q); break;
-      case 'opal': // 🌈 蛋白石
-        glow.beginFill(0xFFFFFF, 0.4); glow.drawCircle(0, 0, 55); glow.endFill();
+      case 'opal': 
+        glow.beginFill(0xFFFFFF, 0.6); glow.drawCircle(0, 0, 55); glow.endFill();
         const o = new window.PIXI.Graphics(); o.beginFill(0xF0F8FF); o.drawEllipse(0, 0, 35, 45); o.endFill();
-        const spots = new window.PIXI.Graphics(); // 迷幻光暈
-        spots.beginFill(0xFFB6C1, 0.7); spots.drawCircle(-10, -15, 20); spots.endFill();
-        spots.beginFill(0x87CEFA, 0.7); spots.drawCircle(15, 5, 22); spots.endFill();
-        spots.beginFill(0x98FB98, 0.7); spots.drawCircle(-5, 20, 18); spots.endFill();
+        const spots = new window.PIXI.Graphics(); 
+        spots.beginFill(0xFFB6C1, 0.9); spots.drawCircle(-10, -15, 20); spots.endFill();
+        spots.beginFill(0x87CEFA, 0.9); spots.drawCircle(15, 5, 22); spots.endFill();
+        spots.beginFill(0x98FB98, 0.9); spots.drawCircle(-5, 20, 18); spots.endFill();
         const sb = new window.PIXI.BlurFilter(); sb.blur = 12; spots.filters = [sb];
         const mask = new window.PIXI.Graphics(); mask.beginFill(0xFFFFFF); mask.drawEllipse(0, 0, 35, 45); mask.endFill();
-        spots.mask = mask; // 遮罩確保光暈不出界
+        spots.mask = mask; 
         core.addChild(o); core.addChild(spots); core.addChild(mask); break;
-      case 'lapis': // 🌌 青金石
-        glow.beginFill(0x4169E1, 0.5); glow.drawCircle(0, 0, 55); glow.endFill();
+      case 'lapis': 
+        glow.beginFill(0x4169E1, 0.7); glow.drawCircle(0, 0, 55); glow.endFill();
         const l = new window.PIXI.Graphics();
-        l.beginFill(0x191970); l.moveTo(-20, -35); l.lineTo(15, -40); l.lineTo(35, -10); l.lineTo(25, 30); l.lineTo(-10, 40); l.lineTo(-35, 10); l.closePath(); l.endFill();
-        l.beginFill(0xFFD700); // 黃鐵礦金箔
+        l.beginFill(0x27408B); l.moveTo(-20, -35); l.lineTo(15, -40); l.lineTo(35, -10); l.lineTo(25, 30); l.lineTo(-10, 40); l.lineTo(-35, 10); l.closePath(); l.endFill();
+        l.beginFill(0xFFD700); 
         l.drawCircle(-10, -20, 2.5); l.drawCircle(15, -15, 2); l.drawCircle(5, 10, 3); l.drawCircle(20, 15, 1.5); l.drawCircle(-15, 20, 2.5); l.drawCircle(-5, -5, 2); l.endFill();
-        l.lineStyle(1.5, 0xA9A9A9, 0.7); // 方解石灰紋
+        l.lineStyle(1.5, 0xD3D3D3, 0.8); 
         l.moveTo(-15, 10); l.lineTo(10, 25); l.moveTo(10, -25); l.lineTo(25, -5); l.moveTo(-25, -15); l.lineTo(-5, 0);
         core.addChild(l); break;
     }
+    
+    // ✨ 動態反光掃描線
+    const shine = new window.PIXI.Graphics();
+    shine.beginFill(0xFFFFFF, 0.1);
+    shine.drawPolygon([-25, -60, 15, -60, -5, 60, -45, 60]); // 畫一條斜線
+    shine.endFill();
+    const shineBlur = new window.PIXI.BlurFilter(); 
+    shineBlur.blur = 15;
+    shine.filters = [shineBlur];
+    core.addChild(shine);
+    currentGemShine = shine;
+
     const glowBlur = new window.PIXI.BlurFilter(); glowBlur.blur = 25; glow.filters = [glowBlur];
     container.addChild(glow); container.addChild(core);
-    return glow; // 回傳光暈層以供呼吸動畫使用
+    return glow; 
   };
 
-  // --- 🧠 計算最高分寶石的函式 ---
   const determineGem = (userWords) => {
     if (!userWords || userWords.length === 0) return 'diamond'; 
     const counts = { pearl: 0, diamond: 0, quartz: 0, opal: 0, lapis: 0 };
@@ -142,13 +166,12 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       if (count > maxCount) { maxCount = count; maxGems = [gem]; } 
       else if (count === maxCount) { maxGems.push(gem); }
     }
-    // 若同分，隨機選出一顆
     return maxGems[Math.floor(Math.random() * maxGems.length)];
   };
 
   const bezelContainer = new window.PIXI.Container();
   app.stage.addChild(bezelContainer);
-  const bezel = new window.PIXI.Graphics(); bezel.beginFill(BEZEL_COLOR); bezel.drawRect(0, MONITOR_H, 400, GAP_H); bezel.endFill();
+  const bezel = new window.PIXI.Graphics(); bezel.beginFill(0x111315); bezel.drawRect(0, MONITOR_H, 400, GAP_H); bezel.endFill();
   bezelContainer.addChild(bezel);
 
   const drops = []; const inkTrails = []; const dropQueue = []; const tabletQueue = []; 
@@ -157,8 +180,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
   const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
     showGem = false; hasTriggeredComplete = false; gemReadyTimer = 0; targetGemScale = 0;
-    
-    // 【關鍵】：生成動畫前，先算出這次要長什麼寶石，並畫出來 (先隱藏)
     const targetGemType = determineGem(userWords);
     currentGemGlow = drawGem(targetGemType, gemContainer);
 
@@ -237,7 +258,10 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       gemContainer.visible = true; targetGemScale = Math.max(0, targetGemScale - 0.0005 * delta); 
       currentGemScale += (Math.max(1.0, targetGemScale) - currentGemScale) * 0.05 * delta;
       gemContainer.y = GEM_CENTER_Y + Math.sin(frameCounter * 0.04) * 5;
-      if (currentGemGlow) currentGemGlow.alpha = 0.5 + Math.sin(frameCounter * 0.1) * 0.2; // 呼吸燈特效
+      
+      // ✨ 呼吸燈特效與表面反光動態
+      if (currentGemGlow) currentGemGlow.alpha = 0.6 + Math.sin(frameCounter * 0.1) * 0.3; 
+      if (currentGemShine) currentGemShine.x = Math.sin(frameCounter * 0.02) * 20;
 
       if (currentGemScale > 0.95 && !hasTriggeredComplete) { gemReadyTimer += delta * 16.66; if (gemReadyTimer >= 2000) { if (typeof onComplete === 'function') onComplete(); hasTriggeredComplete = true; } }
     } else {
