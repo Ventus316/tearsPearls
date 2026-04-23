@@ -1,25 +1,25 @@
 // src/engine/InkEngine.js
 import { 
   WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H, VIRTUAL_H, 
-  CRYING_DURATION, BG_COLOR, TEXT_COLOR, BEZEL_COLOR, FONT_FAMILY, FONT_SIZE_BASE, TEXT_STROKE_WIDTH,
-  NETWORK_DELAY_FRAMES, DISPLACEMENT_STRENGTH, WATER_SPEED_Y, WATER_SPEED_X,
+  CRYING_DURATION, FONT_FAMILY, FONT_SIZE_BASE, TEXT_STROKE_WIDTH,
+  NETWORK_DELAY_FRAMES, WATER_SPEED_Y, WATER_SPEED_X,
   EYE_OFFSET, WORD_SPAWN_INTERVAL, BASE_VELOCITY_X, SWAY_FREQUENCY, SWAY_AMPLITUDE,
   FADE_START_RATIO, FADE_END_RATIO, MIN_ALPHA, ALPHA_EASE, BLUR_START_RATIO, BLUR_MULTIPLIER,
   TRAIL_SPAWN_DENSITY, TRAIL_START_DEPTH, TRAIL_SCALE_Y, TRAIL_SCALE_X_BASE, 
   TRAIL_SCALE_X_DEPTH_MULTIPLIER, TRAIL_INITIAL_BLUR_MULTIPLIER, TRAIL_BASE_ALPHA, 
   TRAIL_DEPTH_ALPHA_MULTIPLIER, TRAIL_EXPAND_SPEED_Y, TRAIL_BLUR_INCREASE_RATE, TRAIL_GRAVITY_MULTIPLIER,
-  CONVERGE_SPEED_MOVE, CONVERGE_SPEED_ALPHA, CONVERGE_SPEED_SCALE, CONVERGE_BOTTOM_OFFSET, CONVERGE_FADE_HEIGHT,
-  GEM_MAPPING
+  CONVERGE_SPEED_MOVE, CONVERGE_SPEED_ALPHA, CONVERGE_SPEED_SCALE, CONVERGE_BOTTOM_OFFSET, CONVERGE_FADE_HEIGHT
 } from '../config/constants';
 
+import { setupMonitor } from './MonitorController';
+import { setupTablet } from './TabletController';
+
 export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
-  // 將背景改為黑色，以凸顯發光效果
   const app = new window.PIXI.Application({
     width: 400, height: TOTAL_H, backgroundColor: 0x0a0a0c, resolution: window.devicePixelRatio || 1, autoDensity: true,
   });
   containerElement.appendChild(app.view);
 
-  // 將文字顏色強制改為偏白，產生反差
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
@@ -30,149 +30,24 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     textGraphic.destroy();
   });
 
-  const videoBaseTexture = new window.PIXI.BaseTexture(videoElement);
-  const videoTexture = new window.PIXI.Texture(videoBaseTexture);
-  const videoSprite = new window.PIXI.Sprite(videoTexture);
-  const videoContainer = new window.PIXI.Container();
-  videoSprite.anchor.set(0.5); videoContainer.addChild(videoSprite);
-  videoSprite.alpha = 0.6; // 稍微調暗鏡頭，營造氣氛
-
-  const monitorMask = new window.PIXI.Graphics();
-  monitorMask.beginFill(0xFFFFFF); monitorMask.drawRect(0, 0, 400, MONITOR_H); monitorMask.endFill();
-  videoContainer.mask = monitorMask;
-  app.stage.addChildAt(videoContainer, 0); app.stage.addChildAt(monitorMask, 0);
-
-  const tabletBg = new window.PIXI.Graphics();
-  tabletBg.beginFill(0x0a0a0c); tabletBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); tabletBg.endFill();
-  app.stage.addChildAt(tabletBg, 1); 
-
-  const svgNs = "http://" + "www.w3.org/2000/svg";
-  const svgNoiseUrl = 'data:image/svg+xml;base64,' + window.btoa(`<svg viewBox="0 0 512 512" xmlns="${svgNs}"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" stitchTiles="stitch" /></filter><rect width="100%" height="100%" filter="url(#noise)" /></svg>`);
-  const noiseTexture = window.PIXI.Texture.from(svgNoiseUrl);
-  const waterSprite = new window.PIXI.TilingSprite(noiseTexture, app.screen.width, app.screen.height);
-  waterSprite.alpha = 0.15; app.stage.addChild(waterSprite);
-
   const masterContainer = new window.PIXI.Container();
-  const displacementFilter = new window.PIXI.DisplacementFilter(waterSprite);
-  displacementFilter.scale.set(DISPLACEMENT_STRENGTH); 
-  
-  // ✨ 殺手鐧：加入 Bloom 濾鏡，整體視覺產生擴散光暈
-  let bloomFilter = null;
-  if (window.PIXI.filters && window.PIXI.filters.BloomFilter) {
-    bloomFilter = new window.PIXI.filters.BloomFilter(8); // 參數為發光強度
-    masterContainer.filters = [displacementFilter, bloomFilter];
-  } else {
-    masterContainer.filters = [displacementFilter];
-  }
-  
   app.stage.addChild(masterContainer);
 
   const trailContainer = new window.PIXI.Container(); masterContainer.addChild(trailContainer);
   const textContainer = new window.PIXI.Container(); masterContainer.addChild(textContainer);
 
-  const GEM_CENTER_Y = TABLET_START_Y + (TABLET_H * 0.7); 
+  // 載入分離的控制器
+  const monitorCtrl = setupMonitor(app, videoElement);
+  const tabletCtrl = setupTablet(app, masterContainer);
+
   const GRAVITY_Y = TABLET_START_Y + TABLET_H - CONVERGE_BOTTOM_OFFSET;
   const FADE_START_Y = TABLET_START_Y + TABLET_H - CONVERGE_FADE_HEIGHT;
 
   let currentGemScale = 0; let targetGemScale = 0; let showGem = false; 
   let gemReadyTimer = 0; let hasTriggeredComplete = false;
 
-  const gemContainer = new window.PIXI.Container();
-  gemContainer.position.set(200, GEM_CENTER_Y);
-  gemContainer.scale.set(0); gemContainer.visible = false;
-  masterContainer.addChildAt(gemContainer, 1); 
-
   let currentGemGlow = null; 
-  let currentGemShine = null; // 紀錄動態反光條
-
-  const drawGem = (type, container) => {
-    container.removeChildren(); 
-    const glow = new window.PIXI.Graphics();
-    const core = new window.PIXI.Container();
-
-    // 由於背景變暗，將寶石的光暈與核心稍微調亮
-    switch(type) {
-      case 'pearl': 
-        glow.beginFill(0xFFE4E1, 0.7); glow.drawCircle(0, 0, 50); glow.endFill();
-        const p = new window.PIXI.Graphics(); p.beginFill(0xFFFAF0); p.drawCircle(0, 0, 35); p.endFill();
-        p.beginFill(0xFFFFFF, 0.9); p.drawCircle(-10, -10, 10); p.endFill(); 
-        const pb = new window.PIXI.BlurFilter(); pb.blur = 4; p.filters = [pb];
-        core.addChild(p); break;
-      case 'diamond': 
-        glow.beginFill(0xE0FFFF, 0.7); glow.drawCircle(0, 0, 60); glow.endFill();
-        const d = new window.PIXI.Graphics();
-        d.lineStyle(2, 0xFFFFFF, 1.0); d.beginFill(0xF0FFFF, 0.9);
-        d.moveTo(-30, -20); d.lineTo(30, -20); d.lineTo(45, 0); d.lineTo(0, 50); d.lineTo(-45, 0); d.closePath(); d.endFill();
-        d.lineStyle(1.5, 0xFFFFFF, 0.8); 
-        d.moveTo(-30, -20); d.lineTo(0, 0); d.lineTo(30, -20);
-        d.moveTo(-45, 0); d.lineTo(0, 0); d.lineTo(45, 0); d.moveTo(0, 0); d.lineTo(0, 50);
-        core.addChild(d); break;
-      case 'quartz': 
-        glow.beginFill(0xF8F8FF, 0.7); glow.drawCircle(0, 0, 60); glow.endFill();
-        const q = new window.PIXI.Graphics();
-        q.lineStyle(2, 0xFFFFFF, 0.9);
-        q.beginFill(0xFFFFFF, 0.9); q.moveTo(-15, 20); q.lineTo(-15, -30); q.lineTo(0, -50); q.lineTo(15, -30); q.lineTo(15, 20); q.closePath(); q.endFill();
-        q.beginFill(0xF5F5F5, 0.9); q.moveTo(-25, 20); q.lineTo(-25, -10); q.lineTo(-15, -25); q.lineTo(-5, -10); q.lineTo(-5, 20); q.closePath(); q.endFill();
-        q.beginFill(0xF5F5F5, 0.9); q.moveTo(5, 20); q.lineTo(5, -5); q.lineTo(15, -20); q.lineTo(25, -5); q.lineTo(25, 20); q.closePath(); q.endFill();
-        core.addChild(q); break;
-      case 'opal': 
-        glow.beginFill(0xFFFFFF, 0.6); glow.drawCircle(0, 0, 55); glow.endFill();
-        const o = new window.PIXI.Graphics(); o.beginFill(0xF0F8FF); o.drawEllipse(0, 0, 35, 45); o.endFill();
-        const spots = new window.PIXI.Graphics(); 
-        spots.beginFill(0xFFB6C1, 0.9); spots.drawCircle(-10, -15, 20); spots.endFill();
-        spots.beginFill(0x87CEFA, 0.9); spots.drawCircle(15, 5, 22); spots.endFill();
-        spots.beginFill(0x98FB98, 0.9); spots.drawCircle(-5, 20, 18); spots.endFill();
-        const sb = new window.PIXI.BlurFilter(); sb.blur = 12; spots.filters = [sb];
-        const mask = new window.PIXI.Graphics(); mask.beginFill(0xFFFFFF); mask.drawEllipse(0, 0, 35, 45); mask.endFill();
-        spots.mask = mask; 
-        core.addChild(o); core.addChild(spots); core.addChild(mask); break;
-      case 'lapis': 
-        glow.beginFill(0x4169E1, 0.7); glow.drawCircle(0, 0, 55); glow.endFill();
-        const l = new window.PIXI.Graphics();
-        l.beginFill(0x27408B); l.moveTo(-20, -35); l.lineTo(15, -40); l.lineTo(35, -10); l.lineTo(25, 30); l.lineTo(-10, 40); l.lineTo(-35, 10); l.closePath(); l.endFill();
-        l.beginFill(0xFFD700); 
-        l.drawCircle(-10, -20, 2.5); l.drawCircle(15, -15, 2); l.drawCircle(5, 10, 3); l.drawCircle(20, 15, 1.5); l.drawCircle(-15, 20, 2.5); l.drawCircle(-5, -5, 2); l.endFill();
-        l.lineStyle(1.5, 0xD3D3D3, 0.8); 
-        l.moveTo(-15, 10); l.lineTo(10, 25); l.moveTo(10, -25); l.lineTo(25, -5); l.moveTo(-25, -15); l.lineTo(-5, 0);
-        core.addChild(l); break;
-    }
-    
-    // ✨ 動態反光掃描線
-    const shine = new window.PIXI.Graphics();
-    shine.beginFill(0xFFFFFF, 0.1);
-    shine.drawPolygon([-25, -60, 15, -60, -5, 60, -45, 60]); // 畫一條斜線
-    shine.endFill();
-    const shineBlur = new window.PIXI.BlurFilter(); 
-    shineBlur.blur = 15;
-    shine.filters = [shineBlur];
-    core.addChild(shine);
-    currentGemShine = shine;
-
-    const glowBlur = new window.PIXI.BlurFilter(); glowBlur.blur = 25; glow.filters = [glowBlur];
-    container.addChild(glow); container.addChild(core);
-    return glow; 
-  };
-
-  const determineGem = (userWords) => {
-    if (!userWords || userWords.length === 0) return 'diamond'; 
-    const counts = { pearl: 0, diamond: 0, quartz: 0, opal: 0, lapis: 0 };
-    userWords.forEach(word => {
-      for (const [gem, wordsList] of Object.entries(GEM_MAPPING)) {
-        if (wordsList.includes(word)) counts[gem]++;
-      }
-    });
-    let maxCount = -1; let maxGems = [];
-    for (const [gem, count] of Object.entries(counts)) {
-      if (count > maxCount) { maxCount = count; maxGems = [gem]; } 
-      else if (count === maxCount) { maxGems.push(gem); }
-    }
-    return maxGems[Math.floor(Math.random() * maxGems.length)];
-  };
-
-  const bezelContainer = new window.PIXI.Container();
-  app.stage.addChild(bezelContainer);
-  const bezel = new window.PIXI.Graphics(); bezel.beginFill(0x111315); bezel.drawRect(0, MONITOR_H, 400, GAP_H); bezel.endFill();
-  bezelContainer.addChild(bezel);
+  let currentGemShine = null;
 
   const drops = []; const inkTrails = []; const dropQueue = []; const tabletQueue = []; 
   let frameCounter = 0; let isCrying = false; let cryingTime = 0; let wordSpawnTimer = 0; let wasActive = false; 
@@ -180,19 +55,26 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
   const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
     showGem = false; hasTriggeredComplete = false; gemReadyTimer = 0; targetGemScale = 0;
-    const targetGemType = determineGem(userWords);
-    currentGemGlow = drawGem(targetGemType, gemContainer);
+    
+    // 使用平板控制器判定與繪製寶石
+    const targetGemType = tabletCtrl.determineGem(userWords);
+    const gemVisuals = tabletCtrl.drawGem(targetGemType, tabletCtrl.gemContainer);
+    currentGemGlow = gemVisuals.glow;
+    currentGemShine = gemVisuals.shine;
 
     const pool = userWords && userWords.length > 0 ? userWords : WORDS;
     const word = pool[Math.floor(Math.random() * pool.length)];
     const chars = word.split('');
     const isLeftEye = Math.random() > 0.5; const eyeData = getEyeData(); let eyeX, eyeY;
+    
+    // 維持舊版 4 點座標發射
     if (eyeData) {
       if (isLeftEye) { eyeX = isInner ? eyeData.leftInner.x : eyeData.leftOuter.x; eyeY = isInner ? eyeData.leftInner.y : eyeData.leftOuter.y; } 
       else { eyeX = isInner ? eyeData.rightInner.x : eyeData.rightOuter.x; eyeY = isInner ? eyeData.rightInner.y : eyeData.rightOuter.y; }
     } else {
       eyeX = app.screen.width * (isLeftEye ? 0.3 : 0.7) + (isInner ? EYE_OFFSET : -EYE_OFFSET); eyeY = 150; 
     }
+    
     chars.forEach((char, index) => { dropQueue.push({ char, x: eyeX, y: eyeY, triggerFrame: frameCounter + (index * WORD_SPAWN_INTERVAL), scale: sizeScale }); });
   };
 
@@ -205,10 +87,10 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
   app.ticker.add((delta) => {
     frameCounter += delta;
-    if (videoElement.videoWidth > 0) {
-       const scale = Math.max(400 / videoElement.videoWidth, MONITOR_H / videoElement.videoHeight);
-       videoSprite.scale.set(scale); videoSprite.scale.x *= -1; videoSprite.position.set(200, MONITOR_H / 2); 
-    }
+    
+    // 更新分離的控制器
+    monitorCtrl.updateVideoScale();
+    tabletCtrl.updateWater(delta);
 
     if (isCrying) {
       cryingTime += delta * 16.66; const p = Math.min(cryingTime / CRYING_DURATION, 1); 
@@ -220,8 +102,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
     for (let i = dropQueue.length - 1; i >= 0; i--) { if (frameCounter >= dropQueue[i].triggerFrame) { const item = dropQueue[i]; spawnSingleChar(item.char, item.x, item.y, item.scale, 1); dropQueue.splice(i, 1); } }
     for (let i = tabletQueue.length - 1; i >= 0; i--) { if (frameCounter >= tabletQueue[i].triggerFrame) { const item = tabletQueue[i]; spawnSingleChar(item.char, item.x, TABLET_START_Y, item.scale, 2, item.vx, item.vy); tabletQueue.splice(i, 1); } }
-
-    waterSprite.tilePosition.y -= WATER_SPEED_Y * delta; waterSprite.tilePosition.x -= WATER_SPEED_X * delta;
 
     for (let i = drops.length - 1; i >= 0; i--) {
       const drop = drops[i]; drop.life += delta;
@@ -255,19 +135,18 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     wasActive = isAnimating; 
 
     if (showGem) {
-      gemContainer.visible = true; targetGemScale = Math.max(0, targetGemScale - 0.0005 * delta); 
+      tabletCtrl.gemContainer.visible = true; targetGemScale = Math.max(0, targetGemScale - 0.0005 * delta); 
       currentGemScale += (Math.max(1.0, targetGemScale) - currentGemScale) * 0.05 * delta;
-      gemContainer.y = GEM_CENTER_Y + Math.sin(frameCounter * 0.04) * 5;
+      tabletCtrl.gemContainer.y = tabletCtrl.GEM_CENTER_Y + Math.sin(frameCounter * 0.04) * 5;
       
-      // ✨ 呼吸燈特效與表面反光動態
       if (currentGemGlow) currentGemGlow.alpha = 0.6 + Math.sin(frameCounter * 0.1) * 0.3; 
       if (currentGemShine) currentGemShine.x = Math.sin(frameCounter * 0.02) * 20;
 
       if (currentGemScale > 0.95 && !hasTriggeredComplete) { gemReadyTimer += delta * 16.66; if (gemReadyTimer >= 2000) { if (typeof onComplete === 'function') onComplete(); hasTriggeredComplete = true; } }
     } else {
-      currentGemScale += (0 - currentGemScale) * 0.1 * delta; if (currentGemScale < 0.01) gemContainer.visible = false;
+      currentGemScale += (0 - currentGemScale) * 0.1 * delta; if (currentGemScale < 0.01) tabletCtrl.gemContainer.visible = false;
     }
-    gemContainer.scale.set(currentGemScale); 
+    tabletCtrl.gemContainer.scale.set(currentGemScale); 
   });
 
   return {

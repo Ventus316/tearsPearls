@@ -7,9 +7,10 @@ export const WORDS = [
   '捨不得', '面子', '期待', '別丟臉', '不能示弱'
 ];
 
-export const MONITOR_H = 700; 
-export const GAP_H = 50;      
-export const TABLET_H = 400;  
+// 根據實體尺寸 (顯示器 48.83x46.37, 平板 28.06x21.49) 換算的精確高度 
+export const MONITOR_H = 380; 
+export const TABLET_H = 306;
+export const GAP_H = 50;  
 
 export const TOTAL_H = MONITOR_H + GAP_H + TABLET_H; 
 export const TABLET_START_Y = MONITOR_H + GAP_H;     
