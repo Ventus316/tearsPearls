@@ -1,7 +1,8 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
-import { createInkEngine } from './engine/InkEngine';
+// import { createInkEngine } from './engine/InkEngine';
+import { createInkEngine } from './engine/Sakura/SakuraInkEngine'
 
 export default function App() {
   const pixiContainer = useRef(null);
@@ -70,13 +71,27 @@ export default function App() {
         if (results.faceLandmarks && results.faceLandmarks.length > 0) {
           const marks = results.faceLandmarks[0];
           const vw = videoRef.current.videoWidth; const vh = videoRef.current.videoHeight;
-          const scale = Math.max(400 / vw, MONITOR_H / vh);
+          const scale = Math.min(400 / vw, MONITOR_H / vh);
           const mapPoint = (mark) => {
              const screenX = 200 - ((mark.x * vw - vw/2) * scale);
              const screenY = (MONITOR_H/2) + ((mark.y * vh - vh/2) * scale);
              return { x: screenX, y: screenY };
           };
-          eyeCoordsRef.current = { leftOuter: mapPoint(marks[33]), leftInner: mapPoint(marks[133]), rightInner: mapPoint(marks[362]), rightOuter: mapPoint(marks[263]) };
+          
+          // 定義完整的下眼緣點位號碼
+          const leftLowerIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133];
+          const rightLowerIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
+
+          eyeCoordsRef.current = { 
+            // 輸出完整的下緣陣列
+            leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])),
+            rightLowerEdge: rightLowerIndices.map(idx => mapPoint(marks[idx])),
+            // 保留舊的內外側點以防萬一
+            leftOuter: mapPoint(marks[33]), 
+            leftInner: mapPoint(marks[133]), 
+            rightInner: mapPoint(marks[362]), 
+            rightOuter: mapPoint(marks[263]) 
+          };
         } else { eyeCoordsRef.current = null; }
       }
       requestAnimationFrame(loop);
