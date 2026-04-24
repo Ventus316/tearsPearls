@@ -3,7 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
 // import { createInkEngine } from './engine/InkEngine';
 // import { createInkEngine } from './engine/style/SakuraInkEngine';
-import { createInkEngine } from './engine/style/Fallingleaves';
+// import { createInkEngine } from './engine/style/Fallingleaves';
+import { createInkEngine } from './engine/style/Hearts';
 
 export default function App() {
   const pixiContainer = useRef(null);
