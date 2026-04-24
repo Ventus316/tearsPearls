@@ -1,4 +1,5 @@
-// src/engine/InkEngine.js
+// src/engine/style/SakuraInkEngine.js
+
 import { 
   WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H, 
   CRYING_DURATION, FONT_FAMILY, FONT_SIZE_BASE, TEXT_STROKE_WIDTH,
