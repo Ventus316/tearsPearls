@@ -6,7 +6,7 @@ import {
 } from '../config/constants';
 
 export const BASE_VELOCITY_X = 0.05;     
-const NETWORK_DELAY_FRAMES = 18; // 0.3 秒延遲
+const NETWORK_DELAY_FRAMES = 18; 
 
 import { setupMonitor } from './MonitorController';
 import { setupTablet } from './0.10.0TabletController';
@@ -109,7 +109,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     for (let i = tabletQueue.length - 1; i >= 0; i--) { 
         if (frameCounter >= tabletQueue[i].triggerFrame) { 
             const item = tabletQueue[i]; 
-            tabletCtrl.drawDebugDot(item.x, item.y); 
+            tabletCtrl.addRipple(item.x, item.y);  // 換成觸發水波紋
             tabletQueue.splice(i, 1); 
         } 
     }
@@ -124,7 +124,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       drop.sprite.scale.set(drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle))), drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle * 0.765))));
       drop.sprite.rotation = Math.sin(iTime * 1.5 + drop.seed) * 0.25;
 
-      // 跨界空間映射
       if (drop.sprite.y > MONITOR_H) { 
         const targetX = drop.sprite.x;
         const normZ = 1.0 - (drop.z / 3.0); 
