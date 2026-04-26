@@ -6,7 +6,7 @@ import {
 } from '../config/constants';
 
 export const BASE_VELOCITY_X = 0.05;     
-const NETWORK_DELAY_FRAMES = 18; // 覆蓋延遲：18 影格約等於 0.3 秒 (60FPS)
+const NETWORK_DELAY_FRAMES = 18; // 0.3 秒延遲
 
 import { setupMonitor } from './MonitorController';
 import { setupTablet } from './0.10.0TabletController';
@@ -21,7 +21,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   const charTextures = {};
   uniqueChars.forEach(char => {
     const textGraphic = new window.PIXI.Text(char, {
-      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: 0x111315, // 文字為深色
+      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: 0x111315, 
       fontWeight: 'bold', stroke: 0xFFFFFF, strokeThickness: TEXT_STROKE_WIDTH
     });
     charTextures[char] = app.renderer.generateTexture(textGraphic);
@@ -33,10 +33,10 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   masterContainer.addChild(textContainer);
 
   const monitorCtrl = setupMonitor(app, videoElement);
-  const tabletCtrl = setupTablet(app); // 移除濾鏡綁定所需的 container 傳遞
+  const tabletCtrl = setupTablet(app);
 
   const drops = []; const dropQueue = []; const tabletQueue = []; 
-  let frameCounter = 0; let isCrying = false; let cryingTime = 0; let wordSpawnTimer = 0; 
+  let frameCounter = 0; let isCrying = false; let cryingTime = 0; let wordSpawnTimer = 0; let wasActive = false;
   let currentWordPool = WORDS; 
 
   const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
@@ -74,32 +74,38 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     textContainer.addChild(dropSprite);
     
     drops.push({ 
-      sprite: dropSprite, 
-      char, 
-      baseScale: depthScale, 
+      sprite: dropSprite, char, baseScale: depthScale, 
       vx: (Math.random() - 0.5) * BASE_VELOCITY_X, 
       vy: (Math.random() * 0.2 + 1.2) * (0.8 + depthScale * 0.2), 
-      seed: seed,
-      z: z  // 把 z 存起來給下面作映射判斷
+      seed: seed, z: z
     });
   };
 
   app.ticker.add((delta) => {
     frameCounter += delta;
+    const iTime = frameCounter * 0.015; 
+    
     monitorCtrl.updateVideoScale();
-    tabletCtrl.updateWater(delta);
+    tabletCtrl.updateWater(delta, iTime);
+
+    const isAnimating = isCrying || dropQueue.length > 0 || tabletQueue.length > 0 || drops.length > 0;
+    tabletCtrl.setShaderVisible(isAnimating);
+
+    if (wasActive && !isAnimating) {
+        if (typeof onComplete === 'function') onComplete();
+    }
+    wasActive = isAnimating;
 
     if (isCrying) {
       cryingTime += delta * 16.66; const p = Math.min(cryingTime / CRYING_DURATION, 1); 
       const framesPerWord = (800 - Math.sin(p * Math.PI) * 800) / 16.66;
       wordSpawnTimer += delta;
       if (wordSpawnTimer >= framesPerWord) { wordSpawnTimer = 0; spawnWordFlow(currentWordPool, Math.random() < (1 - p), 0.4 + Math.sin(p * Math.PI) * 0.6); }
-      if (p === 1) { isCrying = false; if (typeof onComplete === 'function') onComplete(); } 
+      if (p === 1) isCrying = false; 
     }
 
     for (let i = dropQueue.length - 1; i >= 0; i--) { if (frameCounter >= dropQueue[i].triggerFrame) { const item = dropQueue[i]; spawnSingleChar(item.char, item.x, item.y, item.scale); dropQueue.splice(i, 1); } }
     
-    // 觸發偵錯小白點
     for (let i = tabletQueue.length - 1; i >= 0; i--) { 
         if (frameCounter >= tabletQueue[i].triggerFrame) { 
             const item = tabletQueue[i]; 
@@ -110,7 +116,6 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
     for (let i = drops.length - 1; i >= 0; i--) {
       const drop = drops[i];
-      const iTime = frameCounter * 0.015; 
       
       drop.sprite.y += drop.vy * delta; 
       drop.sprite.x += drop.vx * delta + Math.sin(iTime + drop.seed) * 0.2 * delta; 
@@ -119,12 +124,9 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       drop.sprite.scale.set(drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle))), drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle * 0.765))));
       drop.sprite.rotation = Math.sin(iTime * 1.5 + drop.seed) * 0.25;
 
-      // === 核心：跨界座標映射 ===
+      // 跨界空間映射
       if (drop.sprite.y > MONITOR_H) { 
         const targetX = drop.sprite.x;
-        
-        // 映射 Y 軸 (z 數值為 0.0 ~ 3.0)
-        // normZ: z=3(最遠) -> 0.0, z=0(最近) -> 1.0
         const normZ = 1.0 - (drop.z / 3.0); 
         const targetY = TABLET_START_Y + (normZ * TABLET_H);
         
