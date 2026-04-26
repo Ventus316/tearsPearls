@@ -1,10 +1,11 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
-// import { createInkEngine } from './engine/InkEngine';
-// import { createInkEngine } from './engine/style/SakuraInkEngine';
-// import { createInkEngine } from './engine/style/Fallingleaves';
-import { createInkEngine } from './engine/style/Hearts';
+// import { createInkEngine } from './engine/InkEngine';  //原始
+// import { createInkEngine } from './engine/style/SakuraInkEngine';  //顯示器樣式1
+// import { createInkEngine } from './engine/style/Fallingleaves';  //顯示器樣式2
+// import { createInkEngine } from './engine/style/Hearts';  //顯示器樣式3
+import { createInkEngine } from './engine/0.10.0HeartsEngine';  //平板樣式1_顯示器樣式3
 
 export default function App() {
   const pixiContainer = useRef(null);
