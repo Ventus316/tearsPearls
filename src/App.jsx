@@ -2,10 +2,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
 // import { createInkEngine } from './engine/InkEngine';  //原始
-// import { createInkEngine } from './engine/style/SakuraInkEngine';  //顯示器樣式1
-// import { createInkEngine } from './engine/style/Fallingleaves';  //顯示器樣式2
-// import { createInkEngine } from './engine/style/Hearts';  //顯示器樣式3
-import { createInkEngine } from './engine/0.10.0HeartsEngine';  //平板樣式1_顯示器樣式3
+// import { createInkEngine } from './engine/style/SakuraInkEngine';  //顯示器1
+// import { createInkEngine } from './engine/style/Fallingleaves';  //顯示器2
+// import { createInkEngine } from './engine/style/Hearts';  //顯示器3
+// import { createInkEngine } from './engine/0.10.0SakuraInkEngine'; //平板1_顯示器1
+import { createInkEngine } from './engine/0.10.0FallingleavesInkEngine'; //平板1_顯示器2
+// import { createInkEngine } from './engine/0.10.0HeartsEngine';  //平板1_顯示器3
 
 export default function App() {
   const pixiContainer = useRef(null);

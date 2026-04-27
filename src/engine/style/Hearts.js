@@ -125,7 +125,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
     if (isCrying) {
       cryingTime += delta * 16.66; const p = Math.min(cryingTime / CRYING_DURATION, 1); 
-      const framesPerWord = (800 - Math.sin(p * Math.PI) * 800) / 16.66;
+      const framesPerWord = (1000 - Math.sin(p * Math.PI) * 800) / 16.66;
       wordSpawnTimer += delta;
       if (wordSpawnTimer >= framesPerWord) { wordSpawnTimer = 0; spawnWordFlow(currentWordPool, Math.random() < (1 - p), 0.4 + Math.sin(p * Math.PI) * 0.6); }
       if (p === 1) isCrying = false; 

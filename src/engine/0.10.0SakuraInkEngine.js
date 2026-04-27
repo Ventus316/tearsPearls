@@ -1,4 +1,5 @@
-// src/engine/0.10.0HeartsEngine.js
+// src/engine/style/0.10.0SakuraInkEngine.js
+
 import { 
   WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H, 
   CRYING_DURATION, FONT_FAMILY, FONT_SIZE_BASE, TEXT_STROKE_WIDTH,
@@ -6,10 +7,10 @@ import {
 } from '../config/constants';
 
 export const BASE_VELOCITY_X = 0.05;     
-const NETWORK_DELAY_FRAMES = 18; 
+const NETWORK_DELAY_FRAMES = 18; // 0.3 秒延遲
 
 import { setupMonitor } from './MonitorController';
-import { setupTablet } from './0.10.0TabletController';
+import { setupTablet } from './0.10.0TabletController'; // 引入新版平板控制器
 
 export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
   const app = new window.PIXI.Application({
@@ -17,6 +18,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   });
   containerElement.appendChild(app.view);
 
+  // 配合水波紋淺色背景，將字體改為深色
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
@@ -25,6 +27,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
       fontWeight: 'bold', stroke: 0xFFFFFF, strokeThickness: TEXT_STROKE_WIDTH
     });
     charTextures[char] = app.renderer.generateTexture(textGraphic);
+    textGraphic.destroy();
   });
 
   const masterContainer = new window.PIXI.Container();
@@ -33,10 +36,10 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   masterContainer.addChild(textContainer);
 
   const monitorCtrl = setupMonitor(app, videoElement);
-  const tabletCtrl = setupTablet(app);
+  const tabletCtrl = setupTablet(app); // 初始化新版控制器
 
   const drops = []; const dropQueue = []; const tabletQueue = []; 
-  let frameCounter = 0; let isCrying = false; let cryingTime = 0; let wordSpawnTimer = 0; let wasActive = false;
+  let frameCounter = 0; let isCrying = false; let cryingTime = 0; let wordSpawnTimer = 0; let wasActive = false; 
   let currentWordPool = WORDS; 
 
   const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
@@ -63,9 +66,9 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
   const spawnSingleChar = (char, startX, startY, scale) => {
     const dropSprite = new window.PIXI.Sprite(charTextures[char]);
-    dropSprite.anchor.set(0.5); dropSprite.position.set(startX, startY); 
+    dropSprite.anchor.set(0.5); dropSprite.position.set(startX, startY); dropSprite.alpha = 1; 
     
-    const seed = Math.random() * 985.989; 
+    // === 注入 Z 軸深度 (用於平板映射) ===
     const z = Math.random() * 3.0; 
     const depthScale = scale * (1.0 - (z / 3.0) * 0.5); 
     dropSprite.baseScale = depthScale;
@@ -73,11 +76,17 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     
     textContainer.addChild(dropSprite);
     
+    // === 保留櫻花數學種子 ===
+    const f = Math.random(); 
+    
     drops.push({ 
       sprite: dropSprite, char, baseScale: depthScale, 
       vx: (Math.random() - 0.5) * BASE_VELOCITY_X, 
-      vy: (Math.random() * 0.2 + 1.2) * (0.8 + depthScale * 0.2), 
-      seed: seed, z: z
+      vy: (Math.random() * 0.1 + 1) * (0.8 + depthScale * 0.2), 
+      z: z, // 存入深度供後續映射
+      f: f, 
+      si: Math.sign(Math.sin(f * 175.0)) || 1, 
+      rotOffset: Math.sin(f * 175.0) * 1854.0 
     });
   };
 
@@ -86,7 +95,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     const iTime = frameCounter * 0.015; 
     
     monitorCtrl.updateVideoScale();
-    tabletCtrl.updateWater(delta, iTime);
+    tabletCtrl.updateWater(delta, iTime); // 驅動背景與水波
 
     const isAnimating = isCrying || dropQueue.length > 0 || tabletQueue.length > 0 || drops.length > 0;
     tabletCtrl.setShaderVisible(isAnimating);
@@ -94,7 +103,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     if (wasActive && !isAnimating) {
         if (typeof onComplete === 'function') onComplete();
     }
-    wasActive = isAnimating;
+    wasActive = isAnimating; 
 
     if (isCrying) {
       cryingTime += delta * 16.66; const p = Math.min(cryingTime / CRYING_DURATION, 1); 
@@ -106,10 +115,11 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
     for (let i = dropQueue.length - 1; i >= 0; i--) { if (frameCounter >= dropQueue[i].triggerFrame) { const item = dropQueue[i]; spawnSingleChar(item.char, item.x, item.y, item.scale); dropQueue.splice(i, 1); } }
     
+    // 觸發水波紋
     for (let i = tabletQueue.length - 1; i >= 0; i--) { 
         if (frameCounter >= tabletQueue[i].triggerFrame) { 
             const item = tabletQueue[i]; 
-            tabletCtrl.addRipple(item.x, item.y);  // 換成觸發水波紋
+            tabletCtrl.addRipple(item.x, item.y); 
             tabletQueue.splice(i, 1); 
         } 
     }
@@ -117,13 +127,24 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
     for (let i = drops.length - 1; i >= 0; i--) {
       const drop = drops[i];
       
-      drop.sprite.y += drop.vy * delta; 
-      drop.sprite.x += drop.vx * delta + Math.sin(iTime + drop.seed) * 0.2 * delta; 
+      // === 櫻花物理動態 (保留原版) ===
+      const speedFactor = (Math.sin(drop.f + 0.1) * 0.5 + 1.0);
+      drop.sprite.y += drop.vy * speedFactor * delta; 
       
-      const angle = iTime + drop.seed;
-      drop.sprite.scale.set(drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle))), drop.baseScale * (0.4 + 0.6 * Math.abs(Math.cos(angle * 0.765))));
-      drop.sprite.rotation = Math.sin(iTime * 1.5 + drop.seed) * 0.25;
+      const rotAngle = drop.si * iTime + drop.rotOffset;
+      drop.sprite.rotation = rotAngle;
+      
+      drop.sprite.x += drop.vx * delta + Math.cos(rotAngle) * (drop.f * 0.2);
+      
+      const shaderScale = 0.9 + (drop.f * 0.5);
+      const flipFactor = Math.abs(Math.sin(rotAngle)); 
+      drop.sprite.scale.set(
+        drop.baseScale * shaderScale, 
+        drop.baseScale * shaderScale * (0.4 + flipFactor * 0.6)
+      );
+      // ==============================
 
+      // === 跨螢幕映射邏輯 ===
       if (drop.sprite.y > MONITOR_H) { 
         const targetX = drop.sprite.x;
         const normZ = 1.0 - (drop.z / 3.0); 

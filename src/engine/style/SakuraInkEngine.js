@@ -120,7 +120,7 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
 
     if (isCrying) {
       cryingTime += delta * 16.66; const p = Math.min(cryingTime / CRYING_DURATION, 1); 
-      const framesPerWord = (600 - Math.sin(p * Math.PI) * 800) / 16.66;
+      const framesPerWord = (1000 - Math.sin(p * Math.PI) * 800) / 16.66;
       // 調整「大哭模式 (情緒宣洩)」掉落的總詞數與噴發頻率
       wordSpawnTimer += delta;
       if (wordSpawnTimer >= framesPerWord) { wordSpawnTimer = 0; spawnWordFlow(currentWordPool, Math.random() < (1 - p), 0.4 + Math.sin(p * Math.PI) * 0.6); }
