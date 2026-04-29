@@ -34,7 +34,7 @@ export const BEZEL_COLOR = 0x1A1C20;   // 兩塊螢幕間隙(邊框)的遮罩顏
 // 🔤 字體設定
 // ==========================================
 export const FONT_FAMILY = '"PingFang TC", "STKaiti", "KaiTi", serif'; // 文字掉落的字型順序
-export const FONT_SIZE_BASE = 12;      // 基礎字體大小
+export const FONT_SIZE_BASE = 8;      // 基礎字體大小
 export const TEXT_STROKE_WIDTH = 1;    // 文字的外框粗細 (用於增加辨識度)
 
 // ==========================================
