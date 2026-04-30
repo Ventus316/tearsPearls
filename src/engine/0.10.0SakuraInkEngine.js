@@ -10,7 +10,7 @@ export const BASE_VELOCITY_X = 0.05;
 const NETWORK_DELAY_FRAMES = 18; // 0.3 秒延遲
 
 import { setupMonitor } from './MonitorController';
-import { setupTablet } from './0.10.0TabletController'; // 引入新版平板控制器
+import { setupTablet } from './TabletController'; // 引入新版平板控制器
 
 export function createInkEngine(containerElement, getEyeData, videoElement, onComplete) {
   const app = new window.PIXI.Application({
