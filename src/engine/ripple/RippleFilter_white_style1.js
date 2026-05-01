@@ -47,8 +47,13 @@ void main() {
             float textShape = texture2D(uTextTex, textUV).r * bounds;
             
             // 【優化】：將波紋顯影寬度從 1.5 加粗為 3.0，讓文字出現得更明顯
+            // S(a,b,x) = min( max( (x-a)/(b-a), 0 ), 1 )^2 * 
+            //               (3-2 * min( max( (x-a)/(b-a), 0 ), 1 ))
+            
+            // y1 = S(1, 0.0, |x|)
             float band = S(3.0, 0.0, abs(d)); 
             
+            // y2 = 1.0 - S(0.5, 1.0, x)
             float fade = 1.0 - S(0.7, 1.0, t);
             
             revealMask += textShape * band * fade;

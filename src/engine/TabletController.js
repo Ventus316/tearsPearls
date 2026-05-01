@@ -7,7 +7,7 @@ import { TABLET_START_Y, TABLET_H } from '../config/constants';
 // import { rippleFragSource } from './ripple/RippleFilter_white';
 // import { rippleFragSource } from './ripple/RippleFilter_white_style1';
 
-import customTextImg from '../../src/assets/gems/diamond_non_square.png'; 
+import customTextImg from '../../src/assets/gems/textImg_1.png'; 
 import { rippleFragSource } from './ripple/RippleFilter_reveal';
 
 export function setupTablet(app) {
@@ -60,7 +60,7 @@ export function setupTablet(app) {
       rippleFilter.uniforms.uTime = time;
 
       for(let i = 0; i < activeRipples.length; i++) {
-        activeRipples[i].life += delta * 0.012; 
+        activeRipples[i].life += delta * 0.005; 
       }
       activeRipples = activeRipples.filter(r => r.life < 1.0);
 
