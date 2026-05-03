@@ -8,25 +8,24 @@ import { TABLET_START_Y, TABLET_H } from '../config/constants';
 import customTextImg from '../../src/assets/gems/textImg_1.png'; 
 import { rippleFragSource } from './ripple/RippleFilter_reveal';
 
-import pearlImg from '../../src/assets/gems/pearl.png';
-import diamondImg from '../../src/assets/gems/diamond.png';
-import quartzImg from '../../src/assets/gems/quartz.png';
-import opalImg from '../../src/assets/gems/opal.png';
-import lapisImg from '../../src/assets/gems/lapis.png';
-
 export function setupTablet(app) {
   const container = new window.PIXI.Container();
   app.stage.addChildAt(container, 1);
 
+  // ==========================================
+  // [圖層設定] 水波扭曲層 (受 Shader 影響)
+  // ==========================================
   const waterLayer = new window.PIXI.Container();
   container.addChild(waterLayer);
 
+  // 1. 建立純白底板，放在水波層最底下
   const baseBg = new window.PIXI.Graphics();
   baseBg.beginFill(0xFFFFFF); 
   baseBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); 
   baseBg.endFill();
   waterLayer.addChild(baseBg);
 
+  // 2. 設定水波濾鏡 (Shader)，並掛載到水波層上
   const textTexture = window.PIXI.Texture.from(customTextImg);
   const ripplesData = new Float32Array(200 * 4); 
   const rippleFilter = new window.PIXI.Filter(null, rippleFragSource, {
@@ -37,144 +36,161 @@ export function setupTablet(app) {
   rippleFilter.padding = 0;
   waterLayer.filters = [rippleFilter];
 
-  const gemTextures = {
-    pearl: window.PIXI.Texture.from(pearlImg),
-    diamond: window.PIXI.Texture.from(diamondImg),
-    quartz: window.PIXI.Texture.from(quartzImg),
-    opal: window.PIXI.Texture.from(opalImg),
-    lapis: window.PIXI.Texture.from(lapisImg)
+  // ==========================================
+  // [寶石設定] 雙圖層交叉淡入系統
+  // ==========================================
+  // 建立兩個動畫精靈 (初始化為空材質，等 JSON 載入後替換)
+  let gemSpriteBottom = new window.PIXI.AnimatedSprite([window.PIXI.Texture.EMPTY]);
+  let gemSpriteTop = new window.PIXI.AnimatedSprite([window.PIXI.Texture.EMPTY]);
+
+  // 初始化寶石的共用屬性設定函數
+  const initGemSprite = (sprite, parent) => {
+    sprite.anchor.set(0.5); // 設定中心點為縮放基準
+    sprite.x = 200; // X 軸置中
+    sprite.y = TABLET_START_Y + (TABLET_H / 2); // Y 軸置中
+    sprite.alpha = 0; // 初始全透明
+    sprite.scale.set(0.0275); // 初始大小
+    sprite.animationSpeed = 0.5; // 動畫播放速度 (0.5 代表半速播放)
+    parent.addChild(sprite);
   };
 
-  const gemSpriteBottom = new window.PIXI.Sprite();
-  gemSpriteBottom.anchor.set(0.5);
-  gemSpriteBottom.x = 200;
-  gemSpriteBottom.y = TABLET_START_Y + (TABLET_H / 2); 
-  gemSpriteBottom.alpha = 0;
-  gemSpriteBottom.scale.set(0.0275); 
-  waterLayer.addChild(gemSpriteBottom); 
+  // 將底層寶石放入水波層 (會被扭曲)
+  initGemSprite(gemSpriteBottom, waterLayer); 
+  // 將頂層寶石放入主容器 (浮在水面上，不會被扭曲)
+  initGemSprite(gemSpriteTop, container);     
 
-  const gemSpriteTop = new window.PIXI.Sprite();
-  gemSpriteTop.anchor.set(0.5);
-  gemSpriteTop.x = 200;
-  gemSpriteTop.y = TABLET_START_Y + (TABLET_H / 2); 
-  gemSpriteTop.alpha = 0;
-  gemSpriteTop.scale.set(0.0275); 
-  container.addChild(gemSpriteTop); 
-
-  // 🚨 [階段四] 建立專屬的水花粒子圖層，確保水花疊加在最頂層
+  // ==========================================
+  // [粒子系統] 碎裂水花容器
+  // ==========================================
   const splashContainer = new window.PIXI.Container();
   container.addChild(splashContainer);
-  // 用來存放存活粒子的陣列
-  let activeSplashes = [];
+  let activeSplashes = []; // 存放目前存活的水花粒子
 
+  // ==========================================
+  // [狀態變數] 寶石生命週期控制
+  // ==========================================
   let isRevealingGem = false;
-  let gemAnimTime = 0;
-  const GEM_REVEAL_DURATION = 12000; 
+  let gemAnimTime = 0; // 記錄寶石出現了多久 (毫秒)
+  const GEM_REVEAL_DURATION = 12000; // 寶石完全成形所需時間
 
-  const revealGem = (gemType) => {
-    const tex = gemTextures[gemType] || gemTextures['diamond'];
-    gemSpriteBottom.texture = tex;
-    gemSpriteTop.texture = tex;
+  // 快取物件：儲存已經載入過的 JSON 資源，避免重複下載
+  const sheetCache = {};
+
+  // 觸發寶石出現的函式 (gemType 需傳入 'pearl', 'diamond' 等字串)
+  const revealGem = async (gemType) => {
+    isRevealingGem = false; // 在載入完成前先暫停動畫邏輯
     
+    // 如果快取中沒有這個寶石，就發起網路請求去下載 JSON
+    if (!sheetCache[gemType]) {
+      console.log(`📦 正在載入寶石序列圖: /gems/${gemType}.json`);
+      // PIXI 會自動尋找 public/gems/ 下的 json，並讀取對應的 png
+      const sheet = await window.PIXI.Assets.load(`/gems/${gemType}.json`);
+      sheetCache[gemType] = sheet;
+    }
+
+    const sheet = sheetCache[gemType];
+    // 嘗試從 JSON 的 animations 欄位取得陣列，若無則抓取所有 textures
+    const frames = sheet.animations[gemType] || Object.values(sheet.textures);
+
+    // 將載入好的序列圖影格指定給兩個寶石精靈
+    gemSpriteBottom.textures = frames;
+    gemSpriteTop.textures = frames;
+    
+    // 開始播放旋轉動畫
+    gemSpriteBottom.play();
+    gemSpriteTop.play();
+    
+    // 初始化外觀狀態
     gemSpriteBottom.alpha = 0;
     gemSpriteTop.alpha = 0;
     gemSpriteBottom.scale.set(0.0275);
     gemSpriteTop.scale.set(0.0275);
     
+    // 啟動生命週期計時器
     isRevealingGem = true;
     gemAnimTime = 0;
   };
 
-  let activeRipples = [];
+  let activeRipples = []; // 存放目前存活的水波
 
+  // 判斷文字是否砸中「浮出水面的寶石實體」
   const isHittingGem = (x, y) => {
+    // 只有在 10~18 秒之間 (寶石已破水且未消失) 才具備物理碰撞體積
     if (!isRevealingGem || gemAnimTime < 10000 || gemAnimTime > 18000) return false;
-    
     let currentGemY = TABLET_START_Y + (TABLET_H / 2);
     let dist = Math.hypot(x - 200, y - currentGemY);
-    
+    // 碰撞半徑設為 40 像素
     return dist < 40; 
   };
 
+  // 新增水波或水花 (由外部呼叫，傳入文字掉落的座標)
   const addRipple = (x, y) => {
+    // 如果砸中實體寶石，就不產生水波，改產生水花
     if (isHittingGem(x, y)) {
-      // 🚨 [階段四] 觸發水花濺射！
-      // 隨機生成 5 ~ 8 顆水花
-      const numSplashes = Math.floor(Math.random() * 4) + 5; 
-      
+      const numSplashes = Math.floor(Math.random() * 4) + 5; // 隨機產生 5~8 顆水花
       for (let i = 0; i < numSplashes; i++) {
         const dot = new window.PIXI.Graphics();
-        // 畫一個半透明偏白的小圓點 (Alpha: 0.7 ~ 1.0)
-        dot.beginFill(0xFFFFFF, 0.7 + Math.random() * 0.3);
-        // 半徑隨機 0.8 ~ 2.0 像素
-        const radius = Math.random() * 1.2 + 0.8; 
-        dot.drawCircle(0, 0, radius);
+        dot.beginFill(0xFFFFFF, 0.7 + Math.random() * 0.3); // 半透明白色
+        dot.drawCircle(0, 0, Math.random() * 1.2 + 0.8); // 隨機大小
         dot.endFill();
-        
-        dot.x = x;
-        dot.y = y;
+        dot.x = x; dot.y = y;
         splashContainer.addChild(dot);
         
-        // 賦予物理初速
+        // 賦予水花物理初速
         activeSplashes.push({
           sprite: dot,
-          // X軸初速：隨機向左或向右飛 (-3 到 3)
-          vx: (Math.random() - 0.5) * 6,
-          // Y軸初速：隨機向上飛 (-2 到 -6)
-          vy: -(Math.random() * 4 + 2), 
-          // 生命週期 1.0，會在 500ms 內扣完
-          life: 1.0 
+          vx: (Math.random() - 0.5) * 6, // X軸左右飛散
+          vy: -(Math.random() * 4 + 2),  // Y軸向上拋射
+          life: 1.0 // 粒子生命值
         });
       }
-      return; 
+      return; // 結束函式，不執行下方水波邏輯
     }
-
+    
+    // 若未砸中寶石，則產生水波 (轉換為 UV 座標供 Shader 使用)
     const uvX = x / 400.0;
     const uvY = (y - TABLET_START_Y) / TABLET_H;
-    const randomScale = Math.random() * 0.9 + 0.1;
-    
-    activeRipples.push({ x: uvX, y: uvY, life: 0.01, scale: randomScale }); 
-    if(activeRipples.length > 200) activeRipples.shift(); 
+    activeRipples.push({ x: uvX, y: uvY, life: 0.01, scale: Math.random() * 0.9 + 0.1 }); 
+    if(activeRipples.length > 200) activeRipples.shift(); // 限制最多 200 個水波
   };
 
+  // 回傳給主程式的 API 介面與更新迴圈
   return { 
     addRipple, 
     revealGem, 
+    // 每幀執行的更新邏輯 (delta 為時間差)
     updateWater: (delta, time) => {
-      // --- 水波更新 ---
-      for(let i = 0; i < activeRipples.length; i++) {
-        activeRipples[i].life += delta * 0.005; 
-      }
+      
+      // ==========================================
+      // 1. 更新水波資料
+      // ==========================================
+      for(let i = 0; i < activeRipples.length; i++) activeRipples[i].life += delta * 0.005; 
       activeRipples = activeRipples.filter(r => r.life < 1.0);
 
+      // 將水波資料打包進 Float32Array 傳給 Shader
       for(let i = 0; i < 200; i++) {
         if (i < activeRipples.length) {
-          ripplesData[i*4]     = activeRipples[i].x;
+          ripplesData[i*4] = activeRipples[i].x;
           ripplesData[i*4 + 1] = activeRipples[i].y;
           ripplesData[i*4 + 2] = activeRipples[i].life;
           ripplesData[i*4 + 3] = activeRipples[i].scale;
         } else {
-          ripplesData[i*4 + 2] = 0.0; 
+          ripplesData[i*4 + 2] = 0.0; // 將未使用的水波生命值歸零
         }
       }
 
-      // 🚨 [階段四] 水花粒子物理引擎更新
-      // 使用反向迴圈，方便在生命週期結束時安全移除元素
+      // ==========================================
+      // 2. 更新水花粒子 (物理拋物線)
+      // ==========================================
       for (let i = activeSplashes.length - 1; i >= 0; i--) {
         let p = activeSplashes[i];
+        p.vy += 0.3 * delta; // 重力加速度 (Y軸速度逐漸變大/朝下)
+        p.sprite.x += p.vx * delta; // 更新 X 位置
+        p.sprite.y += p.vy * delta; // 更新 Y 位置
+        p.life -= (delta * 16.66) / 500.0; // 扣除生命值 (約 500ms 後死亡)
+        p.sprite.alpha = Math.max(0, p.life); // 透明度隨生命值衰減
         
-        // 1. 套用重力 (向下加速)
-        p.vy += 0.3 * delta; 
-        
-        // 2. 更新位置 (拋物線軌跡)
-        p.sprite.x += p.vx * delta;
-        p.sprite.y += p.vy * delta;
-        
-        // 3. 更新生命週期與透明度 (設定 500 毫秒內歸零)
-        p.life -= (delta * 16.66) / 500.0; 
-        p.sprite.alpha = Math.max(0, p.life);
-        
-        // 4. 壽終正寢：銷毀圖形並移出陣列，釋放記憶體
+        // 若粒子死亡，清除圖形並移出陣列
         if (p.life <= 0) {
             splashContainer.removeChild(p.sprite);
             p.sprite.destroy();
@@ -182,36 +198,46 @@ export function setupTablet(app) {
         }
       }
 
-      // --- 寶石生命週期更新 ---
+      // ==========================================
+      // 3. 更新寶石生命週期與淡入淡出
+      // ==========================================
       if (isRevealingGem) {
-        gemAnimTime += delta * 16.66; 
+        gemAnimTime += delta * 16.66; // 累加動畫時間 (以毫秒計算)
         
         if (gemAnimTime <= 15000) {
+            // [成形階段：0~15秒]
             let progress = Math.min(gemAnimTime / GEM_REVEAL_DURATION, 1.0); 
-            let easeP = progress * progress; 
-            
+            let easeP = progress * progress; // 二次方緩動：起步慢，後面快
             let currentScale = 0.0275 + (easeP * 0.0275);
             let currentAlpha = easeP;
 
+            // [破水而出階段：10~11秒] 計算交叉淡入的比例
             let crossfadeP = 0;
             if (gemAnimTime > 10000) {
+                // crossfadeP 會在 1000 毫秒內從 0 變到 1
                 crossfadeP = Math.min((gemAnimTime - 10000) / 1000.0, 1.0); 
             }
 
+            // 同步兩層寶石的大小
             gemSpriteBottom.scale.set(currentScale);
             gemSpriteTop.scale.set(currentScale);
-
+            
+            // 分配透明度：水下寶石隨時間淡出，水上寶石隨時間淡入
             gemSpriteBottom.alpha = currentAlpha * (1.0 - crossfadeP); 
             gemSpriteTop.alpha = currentAlpha * crossfadeP;            
-
         } else {
+            // [消散階段：15~18秒]
             let fadeP = (gemAnimTime - 15000) / 3000.0; 
             let remainAlpha = Math.max(1.0 - fadeP, 0);
             
-            gemSpriteTop.alpha = remainAlpha;
-            gemSpriteBottom.alpha = 0;
+            gemSpriteTop.alpha = remainAlpha; // 實體寶石淡出
+            gemSpriteBottom.alpha = 0; // 水底寶石保持隱藏
             
-            if (fadeP >= 1.0) isRevealingGem = false;
+            if (fadeP >= 1.0) {
+              isRevealingGem = false; // 結束生命週期
+              gemSpriteBottom.stop(); // 停止旋轉動畫以節省效能
+              gemSpriteTop.stop();
+            }
         }
       }
     }
