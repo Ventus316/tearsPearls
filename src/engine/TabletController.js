@@ -10,41 +10,65 @@ import { TABLET_START_Y, TABLET_H } from '../config/constants';
 import customTextImg from '../../src/assets/gems/textImg_1.png'; 
 import { rippleFragSource } from './ripple/RippleFilter_reveal';
 
+import pearlImg from '../../src/assets/gems/pearl.png';
+import diamondImg from '../../src/assets/gems/diamond.png';
+import quartzImg from '../../src/assets/gems/quartz.png';
+import opalImg from '../../src/assets/gems/opal.png';
+import lapisImg from '../../src/assets/gems/lapis.png';
+
 export function setupTablet(app) {
   const container = new window.PIXI.Container();
   app.stage.addChildAt(container, 1);
 
-  // 1. 純白底板
   const baseBg = new window.PIXI.Graphics();
   baseBg.beginFill(0xFFFFFF); 
   baseBg.drawRect(0, TABLET_START_Y, 400, TABLET_H); 
   baseBg.endFill();
   container.addChild(baseBg);
 
-  // ==========================================
-  // 2. 載入自訂圖片紋理
-  // ==========================================
-  // 直接將 PNG 圖片轉為 PIXI 紋理，取代原本的虛擬畫布與迴圈算圖
   const textTexture = window.PIXI.Texture.from(customTextImg);
-
-  // ==========================================
-  // 3. 掛載 Shader
-  // ==========================================
   const ripplesData = new Float32Array(200 * 3); 
-
   const rippleFilter = new window.PIXI.Filter(null, rippleFragSource, {
     uResolution: [400, TABLET_H],
     uTime: 0,
-    uTextTex: textTexture, // 把你的 PNG 圖片傳給 Shader
+    uTextTex: textTexture, 
     uRipples: ripplesData
   });
   rippleFilter.padding = 0;
-
   baseBg.filters = [rippleFilter];
 
-  // ==========================================
-  // 4. 水波更新邏輯
-  // ==========================================
+  const gemTextures = {
+    pearl: window.PIXI.Texture.from(pearlImg),
+    diamond: window.PIXI.Texture.from(diamondImg),
+    quartz: window.PIXI.Texture.from(quartzImg),
+    opal: window.PIXI.Texture.from(opalImg),
+    lapis: window.PIXI.Texture.from(lapisImg)
+  };
+
+  const gemSprite = new window.PIXI.Sprite();
+  gemSprite.anchor.set(0.5);
+  gemSprite.x = 200;
+  gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40; 
+  gemSprite.alpha = 0;
+  // 【縮小比例】：初始縮小到非常小的 0.1
+  gemSprite.scale.set(0.1); 
+  container.addChild(gemSprite);
+
+  let isRevealingGem = false;
+  let gemAnimTime = 0;
+  const GEM_REVEAL_DURATION = 12000; 
+
+  const revealGem = (gemType) => {
+    gemSprite.texture = gemTextures[gemType] || gemTextures['diamond'];
+    gemSprite.alpha = 0;
+    // 重設為初始極小比例
+    gemSprite.scale.set(0.005);
+    gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40;
+    
+    isRevealingGem = true;
+    gemAnimTime = 0;
+  };
+
   let activeRipples = [];
 
   const addRipple = (x, y) => {
@@ -56,6 +80,7 @@ export function setupTablet(app) {
 
   return { 
     addRipple, 
+    revealGem, 
     updateWater: (delta, time) => {
       rippleFilter.uniforms.uTime = time;
 
@@ -72,6 +97,22 @@ export function setupTablet(app) {
         } else {
           ripplesData[i*3+2] = 0.0; 
         }
+      }
+
+      if (isRevealingGem) {
+        gemAnimTime += delta * 16.66; 
+        let progress = Math.min(gemAnimTime / GEM_REVEAL_DURATION, 1.0);
+        
+        gemSprite.alpha = progress;
+        
+        // 【控制寶石大小的精華區】：
+        // 從極小的 0.1 開始，加上進度比例 (最大 1.0) 乘以 0.2。
+        // 也就是說，當動畫播完時，寶石的 scale 最多只會放大到 0.3！
+        // 如果覺得 0.3 還是太大，可以把 0.2 改成 0.1 (最後變成 0.2 倍)。
+        gemSprite.scale.set(0.005 + (progress * 0.05));
+        
+        gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40 - (progress * 40);
+        gemSprite.rotation = Math.sin(time * 0.5) * 0.05 * progress;
       }
     },
     setShaderVisible: (visible) => {} 
