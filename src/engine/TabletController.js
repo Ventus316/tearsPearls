@@ -25,7 +25,6 @@ export function setupTablet(app) {
   container.addChild(baseBg);
 
   const textTexture = window.PIXI.Texture.from(customTextImg);
-  // 🚨 改為 200 * 4，用來儲存 (x, y, life, scale)
   const ripplesData = new Float32Array(200 * 4); 
   const rippleFilter = new window.PIXI.Filter(null, rippleFragSource, {
     uResolution: [400, TABLET_H],
@@ -44,22 +43,23 @@ export function setupTablet(app) {
   };
 
   const gemSprite = new window.PIXI.Sprite();
-  gemSprite.anchor.set(0.5);
+  gemSprite.anchor.set(0.5); // 確保從中心點放大
   gemSprite.x = 200;
-  gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40; 
+  // 🚨 拔除 +40 的位移，直接鎖死在平板正中央
+  gemSprite.y = TABLET_START_Y + (TABLET_H / 2); 
   gemSprite.alpha = 0;
-  gemSprite.scale.set(0.005); 
+  gemSprite.scale.set(0.0275); 
   container.addChild(gemSprite);
 
   let isRevealingGem = false;
   let gemAnimTime = 0;
-  const GEM_REVEAL_DURATION = 12000; 
 
   const revealGem = (gemType) => {
     gemSprite.texture = gemTextures[gemType] || gemTextures['diamond'];
     gemSprite.alpha = 0;
-    gemSprite.scale.set(0.005);
-    gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40;
+    gemSprite.scale.set(0.0275);
+    // 🚨 拔除 +40 的位移
+    gemSprite.y = TABLET_START_Y + (TABLET_H / 2);
     
     isRevealingGem = true;
     gemAnimTime = 0;
@@ -67,34 +67,25 @@ export function setupTablet(app) {
 
   let activeRipples = [];
 
-  // 🚨 階段一：新增物理結界判定
   const isHittingGem = (x, y) => {
-    // 只有在破水期 (大於 10000 毫秒) 寶石才具有物理實體
-    if (!isRevealingGem || gemAnimTime < 10000) return false;
+    // 只有在破水期 (大於 10000 毫秒)，且還沒完全淡出前 (小於 18000 毫秒)，寶石才具有物理實體
+    if (!isRevealingGem || gemAnimTime < 10000 || gemAnimTime > 18000) return false;
     
-    // 計算當下寶石的真實中心點 Y 座標
-    let progress = Math.min(gemAnimTime / GEM_REVEAL_DURATION, 1.0);
-    let currentGemY = TABLET_START_Y + (TABLET_H / 2) + 40 - (progress * 40);
-    
-    // 計算文字落點與寶石中心的直線距離
+    // 🚨 因為寶石不再上下移動，結界判定也不需要計算移動量了，直接鎖定正中央
+    let currentGemY = TABLET_START_Y + (TABLET_H / 2);
     let dist = Math.hypot(x - 200, y - currentGemY);
     
-    // 設定碰撞半徑為 40 像素 (可依視覺做微調)
     return dist < 40; 
   };
 
   const addRipple = (x, y) => {
-    // 🚨 階段一：結界防禦！
     if (isHittingGem(x, y)) {
-      // 命中實體！我們將在未來階段四把濺射特效寫在這裡
       console.log("💥 文字命中寶石實體，準備濺射！");
-      return; // 直接中斷，不產生水底波紋跟文字顯影
+      return; 
     }
 
     const uvX = x / 400.0;
     const uvY = (y - TABLET_START_Y) / TABLET_H;
-    
-    // 🚨 階段一：產生隨機大小 (0.1 ~ 1.0)
     const randomScale = Math.random() * 0.9 + 0.1;
     
     activeRipples.push({ x: uvX, y: uvY, life: 0.01, scale: randomScale }); 
@@ -110,7 +101,6 @@ export function setupTablet(app) {
       }
       activeRipples = activeRipples.filter(r => r.life < 1.0);
 
-      // 🚨 打包四個維度的資料傳給 Shader
       for(let i = 0; i < 200; i++) {
         if (i < activeRipples.length) {
           ripplesData[i*4]     = activeRipples[i].x;
@@ -124,14 +114,38 @@ export function setupTablet(app) {
 
       if (isRevealingGem) {
         gemAnimTime += delta * 16.66; 
-        let progress = Math.min(gemAnimTime / GEM_REVEAL_DURATION, 1.0);
         
-        gemSprite.alpha = progress;
-        gemSprite.scale.set(0.005 + (progress * 0.05));
-        gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40 - (progress * 40);
-        
-        // 暫時保留程式旋轉，等未來接上序列圖再拔除
-        gemSprite.rotation = Math.sin(time * 0.5) * 0.05 * progress;
+        if (gemAnimTime <= 5000) {
+            gemSprite.alpha = 0;
+            gemSprite.scale.set(0.0275);
+            // 🚨 拔除 +40 的位移
+            gemSprite.y = TABLET_START_Y + (TABLET_H / 2);
+            
+        } else if (gemAnimTime <= 12000) {
+            let p = (gemAnimTime - 5000) / 7000.0; 
+            let easeInP = p * p; 
+            
+            gemSprite.alpha = easeInP;
+            gemSprite.scale.set(0.0275 + (easeInP * 0.0275));
+            // 🚨 拔除垂直動畫，維持置中
+            gemSprite.y = TABLET_START_Y + (TABLET_H / 2);
+            
+        } else if (gemAnimTime <= 15000) {
+            gemSprite.alpha = 1.0;
+            gemSprite.scale.set(0.055);
+            gemSprite.y = TABLET_START_Y + (TABLET_H / 2);
+            
+        } else {
+            let fadeP = (gemAnimTime - 15000) / 3000.0; 
+            
+            gemSprite.alpha = Math.max(1.0 - fadeP, 0);
+            gemSprite.scale.set(0.055);
+            gemSprite.y = TABLET_START_Y + (TABLET_H / 2);
+            
+            if (fadeP >= 1.0) {
+                isRevealingGem = false;
+            }
+        }
       }
     }
   };
