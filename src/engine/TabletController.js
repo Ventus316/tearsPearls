@@ -1,6 +1,5 @@
 // src/engine/TabletController.js
 import { TABLET_START_Y, TABLET_H } from '../config/constants';
-// import bgImagePath from '../../src/assets/Rainier_mood.jpg';  //純白背景可以不用
 // import { rippleFragSource } from './ripple/RippleFilter';
 // import { rippleFragSource } from './ripple/RippleFilter_circle';
 
@@ -50,8 +49,8 @@ export function setupTablet(app) {
   gemSprite.x = 200;
   gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40; 
   gemSprite.alpha = 0;
-  // 【縮小比例】：初始縮小到非常小的 0.1
-  gemSprite.scale.set(0.1); 
+  // 【縮小比例】：初始縮小到非常小的 0.005
+  gemSprite.scale.set(0.005); 
   container.addChild(gemSprite);
 
   let isRevealingGem = false;
@@ -106,9 +105,9 @@ export function setupTablet(app) {
         gemSprite.alpha = progress;
         
         // 【控制寶石大小的精華區】：
-        // 從極小的 0.1 開始，加上進度比例 (最大 1.0) 乘以 0.2。
-        // 也就是說，當動畫播完時，寶石的 scale 最多只會放大到 0.3！
-        // 如果覺得 0.3 還是太大，可以把 0.2 改成 0.1 (最後變成 0.2 倍)。
+        // 從極小的 0.005 開始，加上進度比例 (最大 1.0) 乘以 0.05。
+        // 也就是說，當動畫播完時，寶石的 scale 最多只會放大到 0.055！
+        // 如果覺得 0.055 還是太大，可以把 0.05 改成 0.01 (最後變成 0.015 倍)。
         gemSprite.scale.set(0.005 + (progress * 0.05));
         
         gemSprite.y = TABLET_START_Y + (TABLET_H / 2) + 40 - (progress * 40);
