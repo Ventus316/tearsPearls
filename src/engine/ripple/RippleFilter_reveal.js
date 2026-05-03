@@ -2,9 +2,9 @@
 export const rippleFragSource = `
 precision mediump float;
 varying vec2 vTextureCoord;
+uniform sampler2D uSampler;  // 🚨 PIXI 自動傳入的濾鏡底層影像 (包含純白背景與水底寶石)
 uniform sampler2D uTextTex;  
 uniform vec2 uResolution;
-// 接收 vec4，[x, y, z(life), w(scale)]
 uniform vec4 uRipples[200];    
 
 #define S smoothstep
@@ -28,8 +28,6 @@ void main() {
             vec2 v_raw = (uv - center); 
             vec2 v = v_raw;
             v.x *= aspect; 
-            
-            // 水波物理範圍縮放
             v *= 35.0 / scale; 
             
             float t = life;
@@ -44,9 +42,7 @@ void main() {
             
             circles += 0.5 * normalize(v) * ((p2 - p1) / (2. * h) * (1. - t) * (1. - t));
             
-            // 🚨 【核心修正】：將 v_raw 除以 scale，讓文字 UV 映射範圍跟著等比例縮放！
             vec2 textUV = ((v_raw / scale) / maxR) * vec2(aspect, 1.0) * 0.5 + vec2(0.5);
-            
             float bounds = step(0.0, textUV.x) * step(textUV.x, 1.0) * step(0.0, textUV.y) * step(textUV.y, 1.0);
             
             vec4 texData = texture2D(uTextTex, textUV);
@@ -67,7 +63,13 @@ void main() {
     float edgeDarkening = (1.0 - n.z) * 0.18; 
     
     vec3 actualTexColor = accumulatedColor / max(revealMask, 0.0001);
-    vec3 flatSurfaceColor = mix(vec3(1.0), actualTexColor, clamp(revealMask, 0.0, 1.0));
+    
+    // 🚨 【核心修正】：讀取底層水池影像，並加入水波法線(circles)產生折射扭曲！
+    vec2 distortedUV = uv + (circles * 0.04); 
+    vec4 baseColor = texture2D(uSampler, distortedUV);
+    
+    // 讓文字顯影與水底影像混合
+    vec3 flatSurfaceColor = mix(baseColor.rgb, actualTexColor, clamp(revealMask, 0.0, 1.0));
     vec3 finalColor = flatSurfaceColor - edgeDarkening - (shadow * 0.25);
     
     gl_FragColor = vec4(finalColor, 1.0);
