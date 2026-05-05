@@ -3,7 +3,8 @@
 // 📝 引入全域常數：包含尺寸、時間、字體、物理預設值以及心理測驗字典[cite: 19]
 import { 
   WORDS, TOTAL_H, MONITOR_H, TABLET_START_Y, TABLET_H, 
-  CRYING_DURATION, FONT_FAMILY, FONT_SIZE_BASE, TEXT_STROKE_WIDTH,
+  CRYING_DURATION, FONT_FAMILY, FONT_SIZE_BASE, 
+  TEXT_STROKE_WIDTH, TEXT_FILL_COLOR, TEXT_STROKE_COLOR, TEXT_STROKE_ALPHA, // 新增的常數
   EYE_OFFSET, WORD_SPAWN_INTERVAL, 
   GEM_MAPPING 
 } from '../config/constants';
@@ -33,15 +34,25 @@ export function createInkEngine(containerElement, getEyeData, videoElement, onCo
   // ==========================================
   // 2. 效能優化：文字紋理預先生成 (Texture Cache)
   // ==========================================
-  // 將詞庫打散成單一字元，並利用 PIXI.Text 畫成圖片存進記憶體。
-  // 這樣掉落時只需不斷複製圖片(Sprite)，不需要浪費 GPU 即時算繪文字向量，大幅提升效能。[cite: 19]
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
+    // 📝 使用 constants.js 中的常數進行樣式設定
     const textGraphic = new window.PIXI.Text(char, {
-      fontFamily: FONT_FAMILY, fontSize: FONT_SIZE_BASE, fill: 0x111315, 
-      fontWeight: 'bold', stroke: 0xFFFFFF, strokeThickness: TEXT_STROKE_WIDTH
+      fontFamily: FONT_FAMILY, 
+      fontSize: FONT_SIZE_BASE, 
+      fontWeight: 'bold',
+      fill: TEXT_FILL_COLOR,           // 使用淺藍色常數
+      stroke: TEXT_STROKE_COLOR,       // 使用邊框顏色常數
+      strokeThickness: TEXT_STROKE_WIDTH, 
+      // 📝 透過樣式屬性控制邊框透明度
+      lineJoin: 'round',               // 讓邊框轉角更平滑
     });
+
+    // 💡 為了達成邊框半透明效果，我們直接調整物件的 alpha 
+    // 或者在 PIXI 7 中，stroke 支援 alpha 屬性 (取決於渲染模式)
+    textGraphic.style.strokeAlpha = TEXT_STROKE_ALPHA; 
+
     charTextures[char] = app.renderer.generateTexture(textGraphic);
     textGraphic.destroy();
   });

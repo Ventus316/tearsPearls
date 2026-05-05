@@ -32,12 +32,17 @@ export const VIRTUAL_H = MONITOR_H + TABLET_H;       // 扣除實體間隙後，
 // ==========================================
 
 // ==========================================
-// 🔤 字體設定 (Typography Typography)
+// 🔤 字體與視覺設定 (Typography & Visuals)
 // ==========================================
-// 掉落文字的視覺設定，優先使用蘋方體與楷體，以營造柔軟、情緒化的視覺氛圍。
-export const FONT_FAMILY = '"PingFang TC", "STKaiti", "KaiTi", serif'; // 文字渲染字型優先順序。
-export const FONT_SIZE_BASE = 8;       // 基礎字體大小 (像素)。實際大小會隨深度 Z 軸變化。
-export const TEXT_STROKE_WIDTH = 1;    // 文字外框粗細，用於在複雜背景 (如水波) 中增加文字辨識度。
+// 優先使用黑體 (Sans-serif)，營造現代、簡約的視覺感[cite: 19]
+export const FONT_FAMILY = '"PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif'; 
+export const FONT_SIZE_BASE = 8;        // 基礎字體大小 (像素)[cite: 19]
+
+// 📝 文字顏色設定 (可隨時修改十六進位值)
+export const TEXT_FILL_COLOR = 0xADD8E6;    // 淺藍色文字 (Light Blue)
+export const TEXT_STROKE_COLOR = 0xFFFFFF;  // 邊框顏色 (白色)
+export const TEXT_STROKE_WIDTH = 1;         // 文字外框粗細[cite: 19]
+export const TEXT_STROKE_ALPHA = 0.5;       // 邊框透明度 (0.0 完全透明 ~ 1.0 不透明)
 
 // ==========================================
 // ⏱️ 時間與延遲控制 (Timing & Synchronization)
