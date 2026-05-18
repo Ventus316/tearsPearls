@@ -6,7 +6,7 @@ import { TABLET_START_Y, TABLET_H } from '../config/constants';
 // import { rippleFragSource } from './ripple/RippleFilter_white';
 // import { rippleFragSource } from './ripple/RippleFilter_white_style1';
 import customTextImg from '../../src/assets/gems/textImg_1.png'; 
-import { rippleFragSource } from './ripple/RippleFilter_reveal';
+import { rippleFragSource } from './ripple/RippleFilter_now.js';
 
 export function setupTablet(app) {
   const container = new window.PIXI.Container();
