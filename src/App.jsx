@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WORDS, TOTAL_H, MONITOR_H, GAP_H, TABLET_START_Y, TABLET_H } from './config/constants';
 
 // 📝 [歷史遺留] 以前測試不同粒子引擎留下的 Import 註解
-// import { createInkEngine } from './engine/InkEngine';  //原始
+// import { createInkEngine } from './engine/InkEngine_old';  //原始
 // import { createInkEngine } from './engine/style/SakuraInkEngine';  //顯示器1
 // import { createInkEngine } from './engine/style/Fallingleaves';  //顯示器2
 // import { createInkEngine } from './engine/style/Hearts';  //顯示器3
