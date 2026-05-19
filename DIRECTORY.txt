@@ -1,0 +1,26 @@
+tearsPearls/
+├── 📂 public/                   # 🌟 靜態素材放置區 (Vite 規定：此處檔案不會被編譯)
+│   ├── 📂 gems/                # 各種情緒結晶寶石的序列圖資料夾(含 .json 與 .png)
+│   └── 📂 textImg/             # 各種水波紋文字圖的序列圖資料夾(含 textImg.json 與 .png)
+│
+├── 📂 src/                      # 🌟 核心程式碼開發區
+│   │
+│   ├── 📂 config/               # ⚙️ 全域變數與參數設定
+│   │   └── 📄 constants.js     # 存放 WORDS、TOTAL_H、MONITOR_H、GEM_MAPPING 等所有常數
+│   │
+│   └── 📂 engine/              # 🎮 PIXI.js 互動與物理特效引擎核心
+│        ├── 📄 0.10.0SakuraInkEngine.js  # 主引擎入口 (統籌畫面更新迴圈與物理更新)
+│        ├── 📄 MonitorController.js      # 上半部螢幕控制器 (鏡頭背景、畫面暗化、實體間隙)
+│        └── 📄 TabletController.js       # 下半部平板控制器 (GSAP水波生成、寶石生成、粒子碎裂水花)
+│   
+│   ├── 📄 main.jsx            # 專案進入點 (掛載 React App)
+│   ├── 📄 App.jsx             # 上層 UI 控制中心 (處理 AI 偵測、React 狀態切換)
+│   ├── 📂 assets/             # 🎨 靜態多媒體資源庫 (由 Vite 編譯，當前為空)
+│   └── 📂 old/		    # 舊版素材及程式碼
+├── 📄 DIRECTORY.txt                      # 專案目錄結構
+├── 📄 index.html               # 網頁主網頁入口
+├── 📄 package.json             # 專案套件管理清單 (已安裝 pixi.js, gsap 等)
+├── 📄 README.md                # 專案說明文件 (寫給期末審查或組員看的操作手冊)
+├── 📄 To do.docx               # 專案說明文件 (寫給期末審查或組員看的操作手冊)
+├── 📄 vite.config.js           # Vite 專案設定檔
+└── 📂 node_modules/

@@ -21,8 +21,8 @@ export function setupTablet(app) {
 
   // 🚨 修正路徑：Vite 專案讀取 public 內的檔案，不需加 /public，直接用 / 即可
   Promise.all([
-    fetch('/textImgLone.json').then(res => res.json()), // 自己去抓 JSON 陣列
-    window.PIXI.Assets.load('/textImgLone.png')         // 抓取那張 8 圈合體的大圖
+    fetch('/textImg/textImgLone.json').then(res => res.json()), // 自己去抓 JSON 陣列
+    window.PIXI.Assets.load('/textImg/textImgLone.png')         // 抓取那張 8 圈合體的大圖
   ])
   .then(([jsonData, baseTexture]) => {
     // 根據 JSON 裡的座標，把大圖切成 8 張小圖存起來
