@@ -1,41 +1,40 @@
 // src/views/MonitorView.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { MONITOR_H } from '../config/constants';
-import { createInkEngine } from '../engine/0.10.0SakuraInkEngine'; 
+import { createMonitorEngine } from '../engine/MonitorEngine'; 
+import { io } from 'socket.io-client';
 
 export default function MonitorView() {
-  const pixiContainer = useRef(null); 
-  const videoRef = useRef(null);      
-  const engineRef = useRef(null);     
-  const eyeCoordsRef = useRef(null);  
-  
+  const pixiContainer = useRef(null); const videoRef = useRef(null); const engineRef = useRef(null); const eyeCoordsRef = useRef(null); const socketRef = useRef(null);
   const [isReady, setIsReady] = useState(false);
 
-  // 啟動鏡頭與 AI (顯示器端需要人員先點擊一次以獲取瀏覽器攝影機權限)
-  const initCameraAndAI = async () => {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await new Promise((resolve) => { videoRef.current.onloadedmetadata = () => { videoRef.current.play(); resolve(); }; });
+  useEffect(() => {
+    socketRef.current = io('http://192.168.138.1:3000');
+    socketRef.current.on('monitor-start-crying', (selectedWords) => {
+      if (engineRef.current) engineRef.current.triggerCrying(selectedWords);
+    });
+    return () => { 
+      if (socketRef.current) socketRef.current.disconnect(); 
+      if (engineRef.current) {
+        engineRef.current.destroy();
+        engineRef.current = null;
       }
-    } catch (err) { alert("顯示器需要相機權限！"); return; }
+    };
+  }, []);
 
+  const initCameraAndAI = async () => {
     try {
-      const mpBase = ['https:/', '/cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3'].join('');
-      const modelBase = ['https:/', '/storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'].join('');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      if (videoRef.current) { videoRef.current.srcObject = stream; await new Promise(r => { videoRef.current.onloadedmetadata = () => { videoRef.current.play(); r(); }; }); }
+    } catch (err) { alert("顯示器需要相機權限！"); return; }
+    try {
+      const mpBase = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3';
+      const modelBase = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
       const visionModule = await import(/* @vite-ignore */ mpBase + '/vision_bundle.mjs');
       const vision = await visionModule.FilesetResolver.forVisionTasks(mpBase + '/wasm');
       const faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: modelBase, delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1 });
       
-      // ⚠️ 註：目前暫時先掛載舊的合併版引擎，後續步驟會把它拆乾淨
-      if (!engineRef.current) {
-        engineRef.current = createInkEngine(pixiContainer.current, () => eyeCoordsRef.current, videoRef.current, () => {});
-      }
-      
-      startTracking(faceLandmarker);
-      setIsReady(true);
+      if (!engineRef.current && socketRef.current) engineRef.current = createMonitorEngine(pixiContainer.current, () => eyeCoordsRef.current, videoRef.current, socketRef.current);
+      startTracking(faceLandmarker); setIsReady(true);
     } catch (err) { console.error(err); }
   };
 
@@ -48,18 +47,18 @@ export default function MonitorView() {
         if (results.faceLandmarks && results.faceLandmarks.length > 0) {
           const marks = results.faceLandmarks[0];
           const vw = videoRef.current.videoWidth; const vh = videoRef.current.videoHeight;
-          const scale = Math.min(400 / vw, MONITOR_H / vh);
+          const sw = window.innerWidth; const sh = window.innerHeight;
+          // 🌟 全螢幕滿版縮放的座標對位法
+          const scale = Math.max(sw / vw, sh / vh); 
           const mapPoint = (mark) => ({
-             x: 200 - ((mark.x * vw - vw/2) * scale),
-             y: (MONITOR_H/2) + ((mark.y * vh - vh/2) * scale)
+             x: (sw / 2) - ((mark.x * vw - vw/2) * scale),
+             y: (sh / 2) + ((mark.y * vh - vh/2) * scale)
           });
           const leftLowerIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133];
           const rightLowerIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
           eyeCoordsRef.current = { 
-            leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])),
-            rightLowerEdge: rightLowerIndices.map(idx => mapPoint(marks[idx])),
-            leftOuter: mapPoint(marks[33]), leftInner: mapPoint(marks[133]), 
-            rightInner: mapPoint(marks[362]), rightOuter: mapPoint(marks[263]) 
+            leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])), rightLowerEdge: rightLowerIndices.map(idx => mapPoint(marks[idx])),
+            leftOuter: mapPoint(marks[33]), leftInner: mapPoint(marks[133]), rightInner: mapPoint(marks[362]), rightOuter: mapPoint(marks[263]) 
           };
         } else { eyeCoordsRef.current = null; }
       }
@@ -69,20 +68,18 @@ export default function MonitorView() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#050507]">
-      <div className="relative shadow-2xl border border-[#222] bg-black overflow-hidden" style={{ width: '400px', height: `${MONITOR_H}px` }}>
-        <video ref={videoRef} playsInline muted autoPlay className="hidden" />
-        <div ref={pixiContainer} className="absolute inset-0 z-10" />
-        
-        {/* 開機按鈕 (隱藏在螢幕中，佈展人員用) */}
-        {!isReady && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80">
-            <button onClick={initCameraAndAI} className="px-6 py-2 border border-white/20 text-white rounded-md tracking-widest text-sm hover:bg-white/10">
-              [系統啟動] 啟動顯示器鏡頭
-            </button>
-          </div>
-        )}
-      </div>
+    // 🌟 拔除所有寬高限制，改為 w-screen h-screen
+    <div className="w-screen h-screen bg-[#050507] overflow-hidden relative">
+      <video ref={videoRef} playsInline muted autoPlay className="hidden" />
+      <div ref={pixiContainer} className="absolute inset-0 z-10" />
+      
+      {!isReady && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80">
+          <button onClick={initCameraAndAI} className="px-8 py-3 border border-white/20 text-white rounded-md tracking-widest text-lg hover:bg-white/10 transition-colors">
+            [系統開機] 進入全螢幕追蹤模式
+          </button>
+        </div>
+      )}
     </div>
   );
 }
