@@ -87,6 +87,11 @@ export default function MonitorView() {
    */
   const startTracking = (faceLandmarker) => {
     let lastVideoTime = -1;
+
+    // 定義左右眼下緣的特徵點 Index (用於生成眼淚的起始位置)
+    const leftLowerIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133];
+    const rightLowerIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
+
     const loop = () => {
       if (videoRef.current && videoRef.current.currentTime !== lastVideoTime) {
         lastVideoTime = videoRef.current.currentTime;
@@ -107,10 +112,6 @@ export default function MonitorView() {
              // Y 軸等比例縮放加上置中偏移量
              y: (sh / 2) + ((mark.y * vh - vh/2) * scale)
           });
-
-          // 定義左右眼下緣的特徵點 Index (用於生成眼淚的起始位置)
-          const leftLowerIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133];
-          const rightLowerIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
           
           eyeCoordsRef.current = { 
             leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])), 

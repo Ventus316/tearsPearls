@@ -5,6 +5,11 @@ import { createTabletEngine } from '../engine/TabletEngine';
 import { io } from 'socket.io-client';
 import waitVideo from '../assets/wait_1080p.mp4';
 
+const PRECALCULATED_WORD_ROWS = [];
+for (let i = 0; i < WORDS.length; i += 5) {
+  PRECALCULATED_WORD_ROWS.push(WORDS.slice(i, i + 5));
+}
+
 /**
  * 平板互動視圖 (Tablet View)
  * 負責：互動選詞 UI、與顯示器的 Socket 連動、以及 60 秒螢幕閒置保護機制。
@@ -147,11 +152,6 @@ export default function TabletView() {
     return SETTLEMENT_DESCRIPTIONS?.[selectedWords[selectedWords.length - 1]] || '沉重的落淚，已淬鍊成不碎的結晶。';
   };
 
-  const wordRows = [];
-  for (let i = 0; i < WORDS.length; i += 5) {
-    wordRows.push(WORDS.slice(i, i + 5));
-  }
-
   const renderWordButton = (word) => {
     const selected = selectedWords.includes(word);
     return (
@@ -215,12 +215,13 @@ export default function TabletView() {
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
 
                 <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
-                  {wordRows.map((row, rowIndex) => (
+                  {/* 👇 改成 PRECALCULATED_WORD_ROWS 👇 */}
+                  {PRECALCULATED_WORD_ROWS.map((row, rowIndex) => (
                     <React.Fragment key={rowIndex}>
                       <div className="grid grid-cols-5 gap-10 mx-10 md:mx-20">
                         {row.map(renderWordButton)}
                       </div>
-                      {rowIndex < wordRows.length - 1 && (
+                      {rowIndex < PRECALCULATED_WORD_ROWS.length - 1 && (
                         <div className="w-full h-[1px] md:h-[1.5px] bg-[#e0f8fa]/20 rounded-full my-1"></div>
                       )}
                     </React.Fragment>
