@@ -1,76 +1,42 @@
-# 💧 《落下之後》 (After Falling) - 互動藝術裝置
+# 💧 心之結晶- Interactive Digital Art Installation
 
-> 「你的感性，是你最寶貴的收藏。」
-> 本作品透過互動裝置，將伴隨壓力而生的淚水重新定義為「人生的礦石」。每一滴落下的淚，經過情緒的萃取，最終都會結晶成獨一無二的寶石。
+「你的感性，是你最寶貴的收藏。」
 
-<div align="center">
-  <img src="assets/demo.gif" alt="落下之後 Demo 畫面" width="400" />
-</div>
-
----
+**心之結晶** 是一套雙螢幕互動藝術裝置，利用電腦視覺與實時物理模擬，將使用者的情緒選詞轉化為視覺化的「淚水」，在顯示器上進行 3D 物理演算，並最終在平板控制端結晶為獨特的礦石。本專案旨在探索人類情緒與數位互動之間的張力，並實現跨裝置的無縫體驗。
 
 ## 🛠️ 技術棧 (Tech Stack)
 
-- **前端框架:** React (使用 Vite 建置)
-- **互動渲染引擎:** PixiJS (WebGL)
-- **樣式排版:** Tailwind CSS
-- **電腦視覺:** Google MediaPipe (Face Landmarker)
+- **前端開發**: React (Vite)
+- **互動渲染引擎**: PixiJS (WebGL)
+- **物理與動畫**: GSAP
+- **電腦視覺 (AI)**: Google MediaPipe (Face Landmarker)
+- **即時通訊**: Socket.io (Node.js)
+- **樣式排版**: Tailwind CSS
 
----
+## 💡 核心技術架構 (Technical Highlights)
 
-## ✨ 核心技術亮點 (Technical Highlights)
+本專案採用 **"Display-Controller" 雙螢幕同步架構**，透過 Socket.io 建立低延遲的事件中轉 。
 
-本專案不僅包含前端 UI 介面，更實作了即時的物理運算與跨裝置視覺無縫接軌，以達到最真實的沉浸式互動：
+### 1. 即時臉部特徵映射 (Real-time Face Tracking)
 
-1. **即時眼位動態生成 (Real-time Eye Tracking)**
-   整合 MediaPipe 捕捉觀眾臉部特徵，將眼淚生成的初始座標 `(X, Y)` 精準綁定於使用者的眼眶下緣位置，隨觀者姿態即時連動。
-2. **擬真 3D 物理演算引擎 (3D Particle Physics Engine)**
-   全面改寫底層渲染邏輯，文字下落不再只是 2D 平移。我們導入了 Z 軸深度演算 (Virtual Depth)，依據距離賦予每個字元不同的縮放比例與下落加速度，並結合三角函數 (Sine/Cosine) 達成文字如落葉、櫻花般在空中 3D 翻轉與搖擺的細膩動態。
-3. **跨螢幕物理接力與流體交互 (Cross-Screen Routing & Fluid Interaction)**
-   開發無縫的雙螢幕傳輸協議。當文字實體掉出上方顯示器 (Monitor) 邊界時，程式會精準計算其落點座標與延遲影格，於平板端 (Tablet) 水池精準激起 WebGL 動態水波 (Ripples)；若文字砸中浮出水面的實體寶石，更會觸發具備重力加速度的拋物線水花濺射粒子 (Splash Particles)。
-4. **序列圖動畫與 WebGL 折射渲染 (Sprite Sheet & WebGL Shader Rendering)**
-   - **情緒權重演算**：根據使用者選出的 5 個情緒配方，動態計算權重並決定煉化出珍珠、鑽石、白水晶、蛋白石或青金石。
-   - **效能最佳化渲染**：寶石動畫全面採用 JSON-TP-Hash 紋理打包技術 (Texture Packing)，將 60 幀高畫質動畫壓縮處理，確保行動裝置維持 60fps 流暢度。
-   - **自定義著色器**：撰寫自定義 Fragment Shader，將水底寶石、波紋法線與水面文字進行像素級混合，達成極致逼真的「水底扭曲折射」與「破水而出」的雙圖層交叉淡入 (Crossfade) 視覺表現。
+整合 **MediaPipe Face Landmarker**，捕捉使用者眼部特徵點 。系統將眼淚生成的初始座標 `(X, Y)` 精準綁定於眼眶下緣，確保虛擬淚水與現實中的觀者動態連動 。
 
----
+### 2. Z-軸深度模擬物理引擎 (3D Physics Engine)
 
-## 🚀 如何在本地端運行 (How to Run Locally)
+跳脫傳統 2D 平移，我們開發了基於 **Virtual Depth (Z-axis)** 的物理演算 。每個淚珠字元擁有獨立的加速度、旋轉與縮放係數，結合三角函數 (Sine/Cosine) 模擬落葉般的 3D 漂浮路徑 。
 
-**環境要求：** 請確保您的電腦已安裝 [Node.js](https://nodejs.org/zh-tw/) (建議安裝 LTS 版本)。
+### 3. 跨裝置流體交互協議 (Cross-Screen Fluid Interaction)
 
-### 啟動步驟：
+當文字越過顯示器邊界 (Monitor)，系統計算其座標與速度，透過 Socket.io 觸發平板端 (Tablet) 的 WebGL 水波特效 。若字元與螢幕中央的寶石發生碰撞，將觸發拋物線水花粒子效果 (Splash Particles) 。
 
-1. 複製專案：
-   ```bash
-   git clone https://github.com/你的GitHub帳號名稱/tearsPearls.git
-   ```
-2. 進入專案目錄 (重要)：
-   ```bash
-   cd tearsPearls
-   ```
-3. 安裝專案依賴套件：
-   ```bash
-   npm install
-   ```
-4. 啟動開發伺服器：
-   ```bash
-   npm run dev
-   ```
-5. 開始體驗：
-   終端機會顯示一段 Local 網址（通常為 http://localhost:5173/），按住 Ctrl (Mac 為 Cmd) 並點擊該網址，即可在瀏覽器中觀看互動裝置。
+### 4. 效能優化 (Rendering Performance)
 
----
+- **Texture Packing**: 寶石與詞彙動畫全面採用 JSON-Texture-Hash 紋理打包技術，確保在各類行動裝置上維持 60fps 流暢體驗 。
+- **UV Displacement**: 利用 SVG Displacement Map 實現大螢幕待機圖層的「流動呼吸感」，極大化沉浸式體驗 。
 
-## 📂 系統架構簡述
+## 🎨 互動設計 (Interaction Design)
 
-- **感知層:** Webcam -> MediaPipe (特徵萃取)
-- **運算層:** React 狀態管理 -> PixiJS 畫布渲染 (重力、水流扭曲、Metaball 運算)
-- **表現層:** 直式顯示器 (高幀率流體展示) + 平板控制台 (使用者選詞與 3D 寶石觸發)
-
----
-
-## 🎨 寶石對應邏輯
+本裝置的核心機制在於將使用者的情緒詞彙進行權重加總，並即時煉化為獨特的寶石結晶。我們建立了以下情緒對應字典，確保每一次互動體驗都帶有個人色彩：
 
 | 寶石種類 (Gem Type) | 對應情緒詞組 (Corresponding Emotions) |
 | :------------------ | :------------------------------------ |
@@ -80,9 +46,82 @@
 | **蛋白石 (Opal)**   | 說不出口、後悔、怎麼辦、捨不得        |
 | **青金石 (Lapis)**  | 面子、期待、別丟臉、不能示弱          |
 
----
+## 📂 系統架構目錄 (Directory Structure)
 
-## 👥 開發團隊 (Team)
+tearsPearls/
+├── 📂 public/ # 靜態資源 (素材紋理、JSON)
+├── 📂 src/
+│ ├── 📂 engine/ # PIXI.js 互動渲染邏輯 (物理、控制、粒子系統)
+│ ├── 📂 views/ # React UI 介面 (Monitor/Tablet 視圖)
+│ ├── 📂 config/ # 全域參數與情緒對應字典
+│ └── 📄 App.jsx # 路由分發器 (Router)
+├── 📄 server.js # Socket.io 通訊中樞 (事件中轉)
+└── 📄 vite.config.js # 建置設定
 
-- **技術開發 (科技組):** [李柏融、許肇天] - 負責物理引擎開發、架構設計與視覺辨識串接。
-- **介面與視覺 (美術組):** [余傑克、林昀佑、張庭毓、藍乙甄] - 負責 UI/UX 介面設計、3D 寶石建模與動畫呈現。
+## 🚀 部署與運行 (How to Run)
+
+### 環境需求
+
+- Node.js (LTS 版本)
+- 具備 WebCam 的電腦 (顯示器端)
+
+### 安裝步驟
+
+1.  **Clone 專案**:
+
+```bash
+git clone https://github.com/Ventus316/tearsPearls.git
+```
+
+2.  **安裝依賴**:
+
+```bash
+npm install
+```
+
+3. **設定伺服器 IP**:
+
+```bash
+修改 `src/views/MonitorView.jsx` 與 `src/views/TabletView.jsx` 中的 `SERVER_IP` 為你的區域網路 IP 。
+```
+
+> **💡 如何查詢你的 IP？**
+> **Windows**: 開啟終端機輸入 `ipconfig`，查看「IPv4 位址」。
+> **Mac/Linux**: 開啟終端機輸入 `ifconfig` 或 `ipconfig getifaddr en0`。
+
+4. **啟動後端通訊伺服器 (Terminal 1)**:
+
+請在終端機 (Terminal) 中執行以下指令，確保 Socket.io 伺服器已啟動並監聽 3000 Port：
+
+```bash
+node server.js
+```
+
+5. **啟動前端開發伺服器 (Terminal 2)**:
+
+請開啟**另一個**新的終端機視窗，執行以下指令啟動 Vite 開發伺服器：
+
+```bash
+npm run dev
+```
+
+### 🌐 存取應用程式
+
+啟動伺服器後，請於瀏覽器輸入以下對應網址：
+
+| 設備類型             | 存取網址                               |
+| :------------------- | :------------------------------------- |
+| **顯示器 (Monitor)** | `http://<你的區域網路IP>:5173/monitor` |
+| **平板 (Tablet)**    | `http://<你的區域網路IP>:5173/tablet`  |
+
+> **⚠️ 注意事項：**
+>
+> 1. 請將 `<你的區域網路IP>` 替換為執行專案之電腦的實際 IP (例如：`192.168.1.50`)。
+> 2. 請確保所有裝置皆連線至**同一個區域網路 (Wi-Fi)**。
+
+## 👥 開發團隊 (Credits)
+
+本專案由 [Yuan Ze University - Department of Information and Communication] 團隊開發:
+
+- **技術開發**: 李柏融、許肇天
+- **介面與視覺**: 余傑克、林昀佑、張庭毓、藍乙甄

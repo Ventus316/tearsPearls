@@ -1,33 +1,41 @@
+心之結晶 - 展場互動裝置專案目錄架構
+==================================================
+
+
 tearsPearls/
-├── 📂 node_modules/             # 依賴套件紀錄
-├── 📂 public/                   # 🌟 靜態素材放置區 (此處檔案不會被編譯)
-│   ├── 📂 gems/                # 各種情緒結晶寶石的序列圖資料夾 (含 pearl、diamond 等 .json 與 .png)
-│   └── 📂 textImg/             # 各種水波紋文字圖的序列圖資料夾 (含 textImgLone.json 與 .png)
+├── 📂 public/                   # 靜態資源 (不經 Vite 編譯，直接路徑存取)
+│   ├── 📂 gems/                # 5種情緒結晶寶石素材 (各對應 .json 與 .png)
+│   └── 📂 textImg/             # 20個情緒詞彙水波紋素材 (各對應 .json 與 .png)
 │
-├── 📂 src/                       # 🌟 核心程式碼開發區
-│   ├── 📂 assets/               # 🎨 靜態多媒體資源庫 (由 Vite 編譯，目前為空)
+├── 📂 src/                      # 核心邏輯
+│   ├── 📂 assets/                    # 多媒體資源 (由 Vite 編譯)
+│   │   ├── 📄 wait_720.mp4          # 待機播放影片
+│   │   ├── 📄 wait_1080p.mp4        # 待機播放影片
+│   │   └── 📄 wait_monitor.jpg      # 大螢幕待機圖片
 │   │
-│   ├── 📂 config/               # ⚙️ 全域變頻與參數設定
-│   │   └── 📄 constants.js     # 存放 20 個 WORDS、SETTLEMENT_DESCRIPTIONS、GEM_MAPPING
+│   ├── 📂 config/              # 全域參數設定
+│   │   └── 📄 constants.js          # 詞庫、結算語錄、寶石情緒對應字典、物理參數
 │   │
-│   ├── 📂 engine/                        # 🎮 PIXI.js 互動與物理特效引擎核心
-│   │   ├── 📄 MonitorController.js   # 上半部大螢幕控制器 (視訊 Cover 縮放、位置居中)
-│   │   ├── 📄 MonitorEngine.js       # 上半部大螢幕粒子引擎 (MediaPipe 座標對位、文字眼淚物理下落、跨界發送)
-│   │   ├── 📄 TabletController.js    # 下半部平板控制器 (控制水波紋、水花、寶石 Delay/Fade 狀態機)
-│   │   └── 📄 TabletEngine.js        # 下半部平板引擎入口 (強制 Canvas 100% 滿版、轉發大螢幕結束與流淚訊號)
+│   ├── 📂 engine/              # PIXI.js 互動渲染核心
+│   │   ├── 📄 MonitorEngine.js      # 大螢幕：MediaPipe 臉部偵測、文字掉落物理運動
+│   │   ├── 📄 TabletEngine.js       # 平板：全螢幕 Canvas 綁定、跨裝置座標接收
+│   │   ├── 📄 MonitorController.js  # 大螢幕：WebRTC 鏡頭視訊 Cover 縮放控制器
+│   │   └── 📄 TabletController.js   # 平板：水波特效、水花粒子、寶石顯影狀態機
 │   │
-│   ├── 📂 views/                      # 📱 React 介面視圖層
-│   │   ├── 📄 MonitorView.jsx      # 大螢幕畫面 (相機啟用、AI 臉部邊界偵測與動態 mapPoint 座標映射)
-│   │   └── 📄 TabletView.jsx       # 平板選詞畫面 (4列5欄 Apple 風格粗細分隔線、自動縮放、結算)
+│   ├── 📂 views/               # React UI 介面層
+│   │   ├── 📄 MonitorView.jsx       # 大螢幕畫面：初始化 AI、待機圖層切換
+│   │   └── 📄 TabletView.jsx        # 平板畫面：互動選詞 UI、閒置倒數、Socket 事件觸發
 │   │
-│   ├── 📄 App.jsx               # 上層 UI 控制中心 (處理展場互動主狀態與 Socket 事件傳遞)
-│   ├── 📄 main.jsx              # 專案進入點 (掛載 React App 至 DOM)
-│   └── 📄 index.css             # 全域樣式表 (引入 Tailwind CSS 指令)
+│   ├── 📄 main.jsx             # 應用程式掛載點
+│   ├── 📄 App.jsx              # 路由分發器 (/monitor, /tablet)
+│   └── 📄 index.css            # Tailwind CSS 全域樣式
 │
+├── 📄 server.js                # Socket.io 通訊中樞 (負責雙螢幕事件中轉)
+├── 📄 index.html               # 網頁主入口 (防縮放設定、PIXI CDN 載入)
+├── 📄 vite.config.js           # 建置與開發伺服器設定
+├── 📄 package.json             # 依賴套件管理 (Pixi, GSAP, Socket.io, Tailwind)
 ├── 📄 .gitignore               # Git 忽略清單
 ├── 📄 DIRECTORY.txt            # 本專案目錄結構說明文件
-├── 📄 index.html               # 網頁主程式進入點 (單頁式應用程式 HTML 模板)
-├── 📄 package.json             # 專案套件管理清單 (已安裝 pixi.js, gsap, socket.io-client, tailwindcss 等)
-├── 📄 README.md                # 專案說明文件 (組員操作手冊與佈展執行備忘錄)
 ├── 📄 To do.docx               # 專案待辦事項與進度追蹤
-└── 📄 vite.config.js           # Vite 專案建置與開發伺服器設定檔
+└── 📄 README.md                # 佈展執行手冊與操作說明
+
