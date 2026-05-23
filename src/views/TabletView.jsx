@@ -3,12 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WORDS, SETTLEMENT_DESCRIPTIONS, GEM_MAPPING } from '../config/constants';
 import { createTabletEngine } from '../engine/TabletEngine'; 
 import { io } from 'socket.io-client';
-
-// 🌟 引入待機動畫影片
 import waitVideo from '../assets/wait_1080p.mp4';
 
+/**
+ * 平板互動視圖 (Tablet View)
+ * 負責：互動選詞 UI、與顯示器的 Socket 連動、以及 60 秒螢幕閒置保護機制。
+ */
 export default function TabletView() {
-  const pixiContainer = useRef(null); const engineRef = useRef(null); const socketRef = useRef(null);
+  const pixiContainer = useRef(null); 
+  const engineRef = useRef(null); 
+  const socketRef = useRef(null);
   
   const [interactionState, setInteractionState] = useState('standby'); 
   const [selectedWords, setSelectedWords] = useState([]); 
@@ -17,6 +21,10 @@ export default function TabletView() {
   const isReady = interactionState === 'ready';
   const canCry = isReady && selectedWords.length === 5;
 
+  /**
+   * ⏱️ 60 秒閒置自動休眠機制
+   * 若 60 秒無任何觸控，強制進入待機模式，並同步通知顯示器。
+   */
   const startIdleTimer = () => {
     clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
@@ -26,16 +34,17 @@ export default function TabletView() {
     }, 60000); 
   };
 
-  // 🌟 修復核心 1：只要摸到平板，就瘋狂向大螢幕同步「我醒著」的狀態
+  /**
+   * 👆 全域觸控監聽
+   * 任何觸控都會重置閒置計時器，並向大螢幕發送喚醒同步訊號。
+   */
   const handleGlobalInteraction = () => {
-    // 正在播放動畫或結算畫面時，不干擾計時
     if (interactionState === 'playing') return;
 
     if (interactionState === 'standby') {
       setInteractionState('ready');
     }
     
-    // 🌟 不管是不是從 standby 醒來，只要摸到螢幕就發送 wake-up 同步訊號
     if (socketRef.current) {
       socketRef.current.emit('tablet-wake-up');
     }
@@ -44,22 +53,23 @@ export default function TabletView() {
   };
 
   useEffect(() => {
-    // 🚨 佈展時請將 IP 替換為電腦的真實 IPv4
     const SERVER_IP = 'http://192.168.138.1:3000'; 
     socketRef.current = io(SERVER_IP);
 
     if (pixiContainer.current && !engineRef.current) {
       engineRef.current = createTabletEngine(pixiContainer.current, () => {
         setInteractionState('finished');
-        if (socketRef.current) socketRef.current.emit('tablet-settlement'); // 結算時通知大螢幕淡入待機圖
+        if (socketRef.current) socketRef.current.emit('tablet-settlement');
         startIdleTimer(); 
       });
     }
 
+    // 📥 監聽大螢幕發送的眼淚座標與字元
     socketRef.current.on('tablet-receive-tear', (data) => {
-        if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char);
+      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char);
     });
     
+    // 📥 監聽大螢幕動畫結束訊號
     socketRef.current.on('tablet-show-finished', () => {
       if (engineRef.current) engineRef.current.monitorFinished();
     });
@@ -76,18 +86,41 @@ export default function TabletView() {
     };
   }, []);
 
+  /**
+   * 🔘 切換詞彙選擇狀態
+   */
   const toggleWord = (word) => {
     if (interactionState !== 'ready') return;
-    if (selectedWords.includes(word)) setSelectedWords(selectedWords.filter(w => w !== word));
-    else if (selectedWords.length < 5) setSelectedWords([...selectedWords, word]);
+    if (selectedWords.includes(word)) {
+      setSelectedWords(selectedWords.filter(w => w !== word));
+    } else if (selectedWords.length < 5) {
+      setSelectedWords([...selectedWords, word]);
+    }
   };
 
+  /**
+   * 💎 根據選擇的詞彙計算對應的寶石類型
+   */
   const determineGemType = (userWords) => {
     if (!userWords || userWords.length === 0) return 'diamond'; 
+    
     const counts = { pearl: 0, diamond: 0, quartz: 0, opal: 0, lapis: 0 };
-    userWords.forEach(word => { for (const [gem, wordsList] of Object.entries(GEM_MAPPING)) { if (wordsList.includes(word)) counts[gem]++; } });
-    let maxCount = -1; let selectedGem = 'diamond';
-    for (const [gem, count] of Object.entries(counts)) { if (count > maxCount) { maxCount = count; selectedGem = gem; } }
+    
+    userWords.forEach(word => { 
+      for (const [gem, wordsList] of Object.entries(GEM_MAPPING)) { 
+        if (wordsList.includes(word)) counts[gem]++; 
+      } 
+    });
+    
+    let maxCount = -1; 
+    let selectedGem = 'diamond';
+    
+    for (const [gem, count] of Object.entries(counts)) { 
+      if (count > maxCount) { 
+        maxCount = count; 
+        selectedGem = gem; 
+      } 
+    }
     return selectedGem;
   };
 
@@ -95,6 +128,7 @@ export default function TabletView() {
     if (selectedWords.length !== 5) return;
     setInteractionState('playing'); 
     clearTimeout(idleTimerRef.current); 
+    
     if (socketRef.current && engineRef.current) {
       socketRef.current.emit('tablet-trigger-crying', selectedWords);
       engineRef.current.revealGem(determineGemType(selectedWords));
@@ -140,6 +174,7 @@ export default function TabletView() {
       className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative"
       onPointerDown={handleGlobalInteraction}
     >
+      {/* 待機影片層 */}
       <video
         src={waitVideo}
         autoPlay
@@ -153,6 +188,7 @@ export default function TabletView() {
 
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
+      {/* 互動介面層 */}
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
         <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' || interactionState === 'standby' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
           
@@ -176,7 +212,6 @@ export default function TabletView() {
               <div className="shrink-0 h-[70px] md:h-[90px]"></div>
 
               <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16">
-                
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
 
                 <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
@@ -212,6 +247,7 @@ export default function TabletView() {
             </div>
           )}
 
+          {/* 結算畫面層 */}
           {interactionState === 'finished' && (
             <div className="flex h-full w-full items-center justify-center px-6 z-20 animate-in fade-in duration-1000">
               <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
