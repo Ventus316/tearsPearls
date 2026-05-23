@@ -16,19 +16,16 @@ export default function MonitorView() {
   const socketRef = useRef(null);
   
   const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isStandby, setIsStandby] = useState(true); // 控制待機圖片層的顯示狀態
+  const [isStandby, setIsStandby] = useState(true); 
 
   useEffect(() => {
-    // 🔌 建立 Socket 連線 (佈展時請確認此 IP 與 Server 啟動的 IP 相同)
     socketRef.current = io('http://192.168.138.1:3000');
     
-    // 📥 接收來自平板的「開始流淚」訊號
     socketRef.current.on('monitor-start-crying', (selectedWords) => {
-      setIsStandby(false); // 雙重保險：強制隱藏待機圖片
+      setIsStandby(false); 
       if (engineRef.current) engineRef.current.triggerCrying(selectedWords);
     });
 
-    // 📥 接收來自平板的待機狀態同步訊號
     socketRef.current.on('tablet-wake-up', () => setIsStandby(false));
     socketRef.current.on('tablet-sleep', () => setIsStandby(true));
     socketRef.current.on('tablet-settlement', () => setIsStandby(true));
@@ -42,10 +39,6 @@ export default function MonitorView() {
     };
   }, []);
 
-  /**
-   * 🎥 初始化相機與 MediaPipe AI 模型
-   * 必須由使用者 (工作人員) 手動點擊按鈕觸發，以符合瀏覽器隱私政策。
-   */
   const initCameraAndAI = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -59,9 +52,8 @@ export default function MonitorView() {
     }
     
     try {
-      setIsCameraOn(true); // 成功開啟相機後，隱藏開機按鈕
+      setIsCameraOn(true); 
 
-      // 載入 Google MediaPipe 臉部偵測模型 (WebAssembly)
       const mpBase = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3';
       const modelBase = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
       const visionModule = await import(/* @vite-ignore */ mpBase + '/vision_bundle.mjs');
@@ -72,7 +64,6 @@ export default function MonitorView() {
         numFaces: 1 
       });
       
-      // 初始化 PIXI 引擎
       if (!engineRef.current && socketRef.current) {
         engineRef.current = createMonitorEngine(pixiContainer.current, () => eyeCoordsRef.current, videoRef.current, socketRef.current);
       }
@@ -82,13 +73,9 @@ export default function MonitorView() {
     }
   };
 
-  /**
-   * 👁️ 持續追蹤臉部特徵點並更新座標
-   */
   const startTracking = (faceLandmarker) => {
     let lastVideoTime = -1;
 
-    // 定義左右眼下緣的特徵點 Index (用於生成眼淚的起始位置)
     const leftLowerIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133];
     const rightLowerIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
 
@@ -104,12 +91,9 @@ export default function MonitorView() {
           const sw = window.innerWidth; 
           const sh = window.innerHeight;
           
-          // 📐 座標轉換核心：計算 Object-Fit: Cover 的縮放比例
           const scale = Math.max(sw / vw, sh / vh); 
           const mapPoint = (mark) => ({
-             // X 軸鏡像反轉，並加上置中偏移量
              x: (sw / 2) - ((mark.x * vw - vw/2) * scale),
-             // Y 軸等比例縮放加上置中偏移量
              y: (sh / 2) + ((mark.y * vh - vh/2) * scale)
           });
           
@@ -122,7 +106,7 @@ export default function MonitorView() {
             rightOuter: mapPoint(marks[263]) 
           };
         } else { 
-          eyeCoordsRef.current = null; // 抓不到臉孔時清空座標，交給引擎隨機生成
+          eyeCoordsRef.current = null; 
         }
       }
       requestAnimationFrame(loop);
@@ -132,22 +116,40 @@ export default function MonitorView() {
 
   return (
     <div className="w-screen h-screen bg-[#050507] overflow-hidden relative">
-      {/* 隱藏的原始攝影機畫面 (提供給 PIXI 與 AI 模型讀取) */}
       <video ref={videoRef} playsInline muted autoPlay className="hidden" />
       
-      {/* 🌟 待機圖片圖層 (透過 isStandby 控制透明度) */}
+      {/* 🌟 畫布呼吸風動濾鏡 (SVG Displacement Map) */}
+      {/* 隱藏在背景，專門提供 UV 偏移數學運算給待機圖片使用 */}
+      <svg width="0" height="0" className="absolute pointer-events-none">
+        <filter id="canvas-wind" x="-20%" y="-20%" width="140%" height="140%">
+          {/* 1. 調整波動頻率 (baseFrequency) */}
+          {/* 生成大面積的平滑流動噪點 (baseFrequency 數值越小，波浪越寬廣柔軟) */}
+          <feTurbulence type="fractalNoise" baseFrequency="0.003 0.005" numOctaves="1" result="noise" />
+          {/* 2. 調整波動強度 (scale) */}
+          {/* values="3; 50; 3" 中的 "18" 是最大偏移量。 */}
+          {/* 想要更劇烈的呼吸感，可以把中間的數字加大到 30~50 */}
+          {/* 利用 scale 動畫，製造 UV 偏移的強弱呼吸感 (從微弱的 3 膨脹到 18 再回到 3) */}
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G">
+            <animate attributeName="scale" values="5; 60; 5" dur="10s" repeatCount="indefinite" />
+          </feDisplacementMap>
+        </filter>
+      </svg>
+
+      {/* 🌟 大螢幕待機圖片層 (套用 UV 偏移濾鏡) */}
       <img
         src={waitImage}
+        style={{
+          filter: 'url(#canvas-wind)',
+          transform: 'scale(1.05)' // 💡 稍微放大 5%，避免 UV 偏移時邊緣拉扯露出背後的黑邊
+        }}
         className={`absolute inset-0 w-full h-full object-cover z-30 transition-opacity duration-1000 ${
           isStandby ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         alt="Standby"
       />
 
-      {/* PIXI 物理特效畫布 */}
       <div ref={pixiContainer} className="absolute inset-0 z-10" />
       
-      {/* 開機引導畫面：僅在未授權相機前顯示 */}
       {!isCameraOn && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80">
           <button 
