@@ -157,15 +157,19 @@ export default function TabletView() {
             </div>
           )}
 
+
           {/* 🌟 結算畫面現在有淡入效果了 */}
           {interactionState === 'finished' && (
             <div className="flex h-full w-full items-center justify-center px-6 z-20 animate-in fade-in duration-1000">
               <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
                 <p className="w-full text-center text-xs font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
                 <div className="mb-4 mt-3 h-[2px] w-full bg-white/20" />
-                <p className="px-4 py-2 text-center text-[15px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90">
+                
+                {/* 👇 就是這裡！在 className 中加入 whitespace-pre-line 👇 */}
+                <p className="px-4 py-2 text-center text-[15px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90 whitespace-pre-line">
                   {getSettlementText()}
                 </p>
+                
                 <div className="mb-4 mt-4 h-[2px] w-full bg-white/20" />
                 <button onClick={handleTryAgain} className="w-full rounded-[18px] bg-[#2c2c2e] py-4 text-[14px] font-light tracking-widest text-gray-200 transition-transform active:scale-95 hover:bg-[#3a3a3c]">
                   與另一個自己對話
