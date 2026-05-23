@@ -8,16 +8,18 @@ export default function TabletView() {
   const pixiContainer = useRef(null); const engineRef = useRef(null); const socketRef = useRef(null);
   const [interactionState, setInteractionState] = useState('ready'); 
   const [selectedWords, setSelectedWords] = useState([]); 
+  const isReady = interactionState === 'ready';
+  const canCry = isReady && selectedWords.length === 5;
 
   useEffect(() => {
-    // 🚨 記得檢查你的 IP
+    // 🚨 佈展時請將 IP 替換為電腦的真實 IPv4
     const SERVER_IP = 'http://192.168.138.1:3000'; 
     socketRef.current = io(SERVER_IP);
 
     if (pixiContainer.current && !engineRef.current) engineRef.current = createTabletEngine(pixiContainer.current);
 
     socketRef.current.on('tablet-receive-tear', (data) => {
-      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z); // 接收 nx 比例
+      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z); 
     });
     socketRef.current.on('tablet-show-finished', () => setInteractionState('finished'));
 
@@ -60,65 +62,120 @@ export default function TabletView() {
     return SETTLEMENT_DESCRIPTIONS?.[selectedWords[selectedWords.length - 1]] || '沉重的落淚，已淬鍊成不碎的結晶。';
   };
 
+  const wordRows = [];
+  for (let i = 0; i < WORDS.length; i += 5) {
+    wordRows.push(WORDS.slice(i, i + 5));
+  }
+
+  const renderWordButton = (word) => {
+    const selected = selectedWords.includes(word);
+    return (
+      <button
+        key={word}
+        onClick={() => toggleWord(word)}
+        className={`flex w-full h-[40px] md:h-[48px] lg:h-[52px] items-center justify-center rounded-full border-[2px] md:border-[3px] text-[13px] md:text-[15px] lg:text-[16px] font-medium tracking-[0.18em] transition-all duration-200 ${
+          selected
+            ? 'border-[#e6ffff] bg-[#b8d8f0] text-[#173133] shadow-[0_0_15px_rgba(255,255,255,0.7)] scale-[1.03]'
+            : 'border-[#b8e8ea] bg-[#a8cfea] text-[#173133] shadow-[0_0_8px_rgba(255,255,255,0.3)] hover:-translate-y-1 hover:brightness-105'
+        }`}
+      >
+        {word}
+      </button>
+    );
+  };
+
   return (
-    // 🌟 拔除所有寬高限制，改為 w-screen h-screen 全螢幕
-    <div className="w-screen h-screen bg-[#050507] text-[#E8E4D9] font-sans select-none overflow-hidden relative">
-      
-      {/* 🌟 滿版水波與寶石畫布 */}
+    <div className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative">
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
-      {/* 標題與 UI 面板層：永遠在全螢幕垂直水平置中 */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-20 pointer-events-none">
+      {/* 💡 調整 1：移除了外層的 p-4 md:p-6 (內距)，讓底板可以直接碰到螢幕邊緣 */}
+      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
         
-        <div className={`flex flex-col items-center pointer-events-auto transition-all duration-1000 ${interactionState === 'playing' ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-          <div className="mb-8 text-center px-4">
-            <h1 className="text-4xl font-extralight mb-2 tracking-[0.4em] text-white/90 drop-shadow-lg">AFTER FALLING</h1>
-            <p className="text-xs tracking-[0.6em] text-amber-100/40 uppercase">The Alchemy of Tears</p>
-          </div>
-
+        {/* 💡 調整 2：寬高改為 w-full h-full，並使用 rounded-[64px] 產生完美的大圓角 */}
+        <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
+          
           {interactionState === 'ready' && (
-            // UI 面板稍微加寬 (w-[420px]) 以適應大螢幕平板
-            <div className="flex flex-col items-center bg-[#1c1c1e]/70 backdrop-blur-2xl border border-white/10 px-8 py-8 rounded-2xl shadow-2xl w-[420px]">
-              <div className="flex justify-between w-full items-end mb-3 px-1">
-                <span className="text-gray-300 text-[13px] font-light tracking-widest">拾起 5 片壓抑在心底的碎屑</span>
-                <span className="text-gray-500 text-xs tracking-wider">{selectedWords.length}/5</span>
-              </div>
-              <div className="w-full h-[2px] bg-white/20 mb-4"></div>
+            <div className="flex h-full w-full flex-col">
               
-              <div className="flex flex-col gap-2 w-full">
-                {Array.from({ length: Math.ceil(WORDS.length / 4) }).map((_, rowIndex) => (
-                  <div key={rowIndex} className="grid grid-cols-4 bg-[#1c1c1e] border border-white/10 rounded-md overflow-hidden w-full">
-                    {WORDS.slice(rowIndex * 4, rowIndex * 4 + 4).map(word => (
-                      <button key={word} onClick={() => toggleWord(word)} className={`py-3 text-xs tracking-widest transition-colors duration-150 ${selectedWords.includes(word) ? 'bg-white text-black font-medium' : 'bg-transparent text-gray-400 hover:bg-white/5'}`}>
-                        {word}
-                      </button>
-                    ))}
-                  </div>
-                ))}
+              {/* 🌟 頂部超大橢圓計數器 */}
+              <div 
+                className="absolute left-1/2 top-0 flex items-end justify-center z-10"
+                style={{ transform: 'translate(-50%, calc(-50% - 175px))' }} 
+              >
+                <div className="flex h-[505px] w-[600px] rounded-[50%] items-end justify-center border-[8px] border-[#e0f8fa] bg-[#fdffff] shadow-[0_0_60px_rgba(214,255,255,0.85)]">
+                  <span 
+                    className="text-[40px] font-normal tracking-[0.05em] text-[#868999]"
+                    style={{ transform: 'translateY(-5px)' }} 
+                  >
+                    {selectedWords.length}/5
+                  </span>
+                </div>
               </div>
 
-              {selectedWords.length === 5 && (
-                <div className="w-full mt-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
-                  <div className="w-full h-[2px] bg-white/20 mb-5"></div>
-                  <button onClick={handleCrying} className="px-10 py-3 bg-white hover:bg-gray-200 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] text-black text-xs font-medium tracking-widest transition-transform active:scale-95 w-auto text-center">
-                    盡情哭吧 GO
-                  </button>
+              {/* 頂部緩衝區 */}
+              <div className="shrink-0 h-[70px] md:h-[110px]"></div>
+
+              {/* 🌟 核心層次排版區塊 */}
+              <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16">
+                
+                {/* ➖ 上方【粗】分隔線 */}
+                <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
+
+                {/* 詞彙區 */}
+                <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
+                  {wordRows.map((row, rowIndex) => (
+                    <React.Fragment key={rowIndex}>
+                      
+                      <div className="grid grid-cols-5 gap-10 mx-10 md:mx-20">
+                        {row.map(renderWordButton)}
+                      </div>
+                      
+                      {/* ➖ 中間【細】分隔線 */}
+                      {rowIndex < wordRows.length - 1 && (
+                        <div className="w-full h-[1px] md:h-[1.5px] bg-[#e0f8fa]/20 rounded-full my-1"></div>
+                      )}
+
+                    </React.Fragment>
+                  ))}
                 </div>
-              )}
+
+                {/* ➖ 下方【粗】分隔線 */}
+                <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mt-3 md:mt-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
+
+              </div>
+
+              {/* 🌟 底部常駐按鈕 */}
+              <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-8 md:pt-3 md:pb-12">
+                <button
+                  onClick={handleCrying}
+                  disabled={!canCry}
+                  className={`flex h-[50px] md:h-[60px] lg:h-[64px] w-[min(60vw,320px)] items-center justify-center rounded-full border-[3px] px-6 text-[20px] font-semibold tracking-[0.2em] transition-all duration-300 md:text-[24px] ${
+                    canCry
+                      ? 'border-[#d9f7f7] bg-[#585b6e] text-[#94eaec] shadow-[0_0_24px_rgba(148,234,236,0.35)] hover:brightness-110 active:scale-[0.98] cursor-pointer'
+                      : 'cursor-not-allowed border-[#d9f7f7]/60 bg-[#4d5061] text-[#94eaec]/50 opacity-80'
+                  }`}
+                >
+                  盡情哭吧
+                </button>
+              </div>
+              
             </div>
           )}
 
+          {/* 結算畫面 */}
           {interactionState === 'finished' && (
-            <div className="flex flex-col items-center bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 px-8 py-8 rounded-2xl shadow-2xl w-[400px]">
-              <p className="text-white/40 text-xs font-light tracking-[0.2em] w-full text-center">情緒已結晶</p>
-              <div className="w-full h-[2px] bg-white/20 mt-3 mb-4"></div>
-              <p className="text-amber-50/90 text-sm font-light tracking-[0.15em] text-center leading-relaxed px-4 py-2">
-                {getSettlementText()}
-              </p>
-              <div className="w-full h-[2px] bg-white/20 mt-4 mb-4"></div>
-              <button onClick={handleTryAgain} className="w-full py-3 bg-[#2c2c2e] hover:bg-[#3a3a3c] rounded-lg font-light text-gray-200 tracking-widest text-xs transition-transform active:scale-95">
-                與另一個自己對話
-              </button>
+            <div className="flex h-full w-full items-center justify-center px-6 z-20">
+              <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
+                <p className="w-full text-center text-xs font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
+                <div className="mb-4 mt-3 h-[2px] w-full bg-white/20" />
+                <p className="px-4 py-2 text-center text-[15px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90">
+                  {getSettlementText()}
+                </p>
+                <div className="mb-4 mt-4 h-[2px] w-full bg-white/20" />
+                <button onClick={handleTryAgain} className="w-full rounded-[18px] bg-[#2c2c2e] py-4 text-[14px] font-light tracking-widest text-gray-200 transition-transform active:scale-95 hover:bg-[#3a3a3c]">
+                  與另一個自己對話
+                </button>
+              </div>
             </div>
           )}
         </div>
