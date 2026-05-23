@@ -57,7 +57,7 @@ export default function TabletView() {
     }
 
     socketRef.current.on('tablet-receive-tear', (data) => {
-      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z); 
+        if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char);
     });
     
     socketRef.current.on('tablet-show-finished', () => {

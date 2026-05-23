@@ -1,21 +1,53 @@
 // src/engine/TabletController.js
 import { gsap } from 'gsap'; 
+import { WORDS } from '../config/constants'; // 🌟 引入 20 個詞庫
 
 export function setupTablet(app, onSettlement) {
   const container = new window.PIXI.Container();
   app.stage.addChild(container);
 
-  const rippleTextures = {};
-  Promise.all([
-    fetch('/textImg/textImgLone.json').then(res => res.json()), 
-    window.PIXI.Assets.load('/textImg/textImgLone.png')         
-  ])
-  .then(([jsonData, baseTexture]) => {
+  // 🌟 將 rippleTextures 改為兩層的字典結構
+  const rippleTextures = { fallback: {} };
+
+  // ==========================================
+  // 1. 載入通用的「預設水波紋」(Fallback)
+  // ==========================================
+  fetch('/textImg/textImgLone.json').then(res => res.json()).then(async jsonData => {
+    const baseTexture = await window.PIXI.Assets.load('/textImg/textImgLone.png');
+    rippleTextures['fallback'] = {};
     jsonData.forEach(data => {
       const rect = new window.PIXI.Rectangle(data.x, data.y, data.width, data.height);
-      rippleTextures[data.name] = new window.PIXI.Texture(baseTexture, rect);
+      
+      // 🌟 神奇魔法：從 "textImgLone_1" 裡面自動切出 "1"
+      // 就算設計師只寫 "1"，或是寫 "孤單_1"，這個寫法都能精準抓到數字！
+      const frameId = data.name.split('_').pop(); 
+      
+      rippleTextures['fallback'][frameId] = new window.PIXI.Texture(baseTexture, rect);
     });
-  }).catch(e => console.error(e));
+  }).catch(e => console.warn("Fallback ripple missing:", e));
+
+
+  // ==========================================
+  // 2. 動態背景載入 20 個詞彙的專屬水波紋
+  // ==========================================
+  WORDS.forEach(word => {
+    fetch(`/textImg/${word}.json`).then(res => {
+      if (!res.ok) throw new Error(`Missing ${word}.json`);
+      return res.json();
+    }).then(async jsonData => {
+      const baseTexture = await window.PIXI.Assets.load(`/textImg/${word}.png`);
+      rippleTextures[word] = {};
+      jsonData.forEach(data => {
+        const rect = new window.PIXI.Rectangle(data.x, data.y, data.width, data.height);
+        
+        // 🌟 神奇魔法：不管 JSON 裡面叫什麼，都切出最後的數字 (例如 "孤單_1" -> "1")
+        const frameId = data.name.split('_').pop();
+        
+        rippleTextures[word][frameId] = new window.PIXI.Texture(baseTexture, rect);
+      });
+    }).catch(() => { /* 靜默忽略，因為素材還沒齊全很正常 */ });
+  });
+
 
   const waterLayer = new window.PIXI.Container();
   container.addChild(waterLayer);
@@ -25,7 +57,6 @@ export function setupTablet(app, onSettlement) {
 
   const initGemSprite = (sprite, parent) => {
     sprite.anchor.set(0.5); 
-    // 退回舊版：完全死守平板螢幕的正中央，不加偏移量
     sprite.x = app.screen.width / 2; 
     sprite.y = app.screen.height / 2; 
     sprite.alpha = 0; 
@@ -66,18 +97,13 @@ export function setupTablet(app, onSettlement) {
     phase = 'DELAY';
     timer = 0;
     isMonitorDone = false;
-    activeRipplesList = []; // 重置水波計數
+    activeRipplesList = []; 
   };
 
-  // 🌟 碰撞判定範圍與寶石圖片中心完全一致
   const isHittingGem = (x, y) => {
     if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
     if (phase === 'FADE_IN' && timer < 3000) return false; 
-    
-    // 依據螢幕正中央進行距離判定
     let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    
-    // 將碰撞半徑放大至 180，確保高解析度螢幕也能準確砸出水花
     return dist < 180; 
   };
 
@@ -89,7 +115,7 @@ export function setupTablet(app, onSettlement) {
     { id: 7, start: 24, peak: 37, end: 55 }, { id: 8, start: 27, peak: 43, end: 74 }
   ];
 
-  const addRipple = (x, y) => {
+  const addRipple = (x, y, char) => {
     if (isHittingGem(x, y)) {
       const numSplashes = Math.floor(Math.random() * 4) + 5; 
       for (let i = 0; i < numSplashes; i++) {
@@ -104,7 +130,6 @@ export function setupTablet(app, onSettlement) {
       return; 
     }
     
-    // 在引擎層面紀錄這個水波紋的精確壽命 (最大影格 74 / 30fps = 2460ms)
     activeRipplesList.push({ timer: 2460 }); 
     
     const dropContainer = new window.PIXI.Container();
@@ -115,8 +140,15 @@ export function setupTablet(app, onSettlement) {
     const randomScale = 0.1 + Math.random() * 0.15; 
 
     RIPPLE_KEYFRAMES.forEach(data => {
-      const textureName = `textImgLone_${data.id}`;
-      const texture = rippleTextures[textureName];
+      // 🌟 現在這裡非常乾淨，只需要直接用 1, 2, 3 來呼叫
+      const frameId = String(data.id); 
+      
+      let texture = rippleTextures[char]?.[frameId];
+
+      if (!texture) {
+        texture = rippleTextures['fallback']?.[frameId];
+      }
+
       if (!texture) return; 
 
       const sprite = new window.PIXI.Sprite(texture);
@@ -141,7 +173,6 @@ export function setupTablet(app, onSettlement) {
   return { 
     addRipple, revealGem, monitorFinished,
     updateWater: (delta, time) => {
-      // 每一幀死守螢幕正中央
       const centerX = app.screen.width / 2;
       const centerY = app.screen.height / 2;
       
@@ -150,7 +181,6 @@ export function setupTablet(app, onSettlement) {
       gemSpriteTop.x = centerX;
       gemSpriteTop.y = centerY;
 
-      // 1. 更新小水花物理
       for (let i = activeSplashes.length - 1; i >= 0; i--) {
         let p = activeSplashes[i];
         p.vy += 0.4 * delta; p.sprite.x += p.vx * delta; p.sprite.y += p.vy * delta; 
@@ -158,22 +188,18 @@ export function setupTablet(app, onSettlement) {
         if (p.life <= 0) { splashContainer.removeChild(p.sprite); p.sprite.destroy(); activeSplashes.splice(i, 1); }
       }
 
-      // 2. 更新圈狀水波紋的生命倒數
       for (let i = activeRipplesList.length - 1; i >= 0; i--) {
         activeRipplesList[i].timer -= delta * 16.66;
         if (activeRipplesList[i].timer <= 0) activeRipplesList.splice(i, 1);
       }
 
-      // 3. 全新防彈級時間軸狀態機
       if (phase !== 'IDLE') {
         timer += delta * 16.66; 
         
         if (phase === 'DELAY') {
-          // (1) 等待 5 秒 (流淚 1/3)
           if (timer >= 5000) { phase = 'FADE_IN'; timer = 0; }
         } 
         else if (phase === 'FADE_IN') {
-          // (2) 寶石淡入浮現
           let progress = Math.min(timer / 10000, 1.0); 
           let easeP = progress * progress; 
           let currentScale = 0.04 + (easeP * 0.04);
@@ -185,29 +211,24 @@ export function setupTablet(app, onSettlement) {
           if (progress >= 1.0) { phase = 'WAIT_MONITOR'; }
         }
         else if (phase === 'WAIT_MONITOR') {
-          // (3) 確認顯示器「流淚完畢」且畫面上 0 個眼淚
           if (isMonitorDone) { phase = 'WAIT_RIPPLES'; }
         }
         else if (phase === 'WAIT_RIPPLES') {
-          // (4) 確認平板上「沒有任何水波紋或水花」
           if (activeSplashes.length === 0 && activeRipplesList.length === 0) {
             phase = 'SETTLEMENT_DELAY';
             timer = 0;
           }
         }
         else if (phase === 'SETTLEMENT_DELAY') {
-          // ⚠️ 防呆攔截：如果這 1.5 秒內網路延遲又噴出水花或水波，立刻退回上一步重新等待清空！
           if (activeSplashes.length > 0 || activeRipplesList.length > 0) {
             phase = 'WAIT_RIPPLES';
           } 
-          // (5) 畫面淨空停留 1.5 秒
           else if (timer >= 1500) { 
             phase = 'FADE_OUT'; 
             timer = 0; 
           }
         }
         else if (phase === 'FADE_OUT') {
-          // (6) 寶石開始淡出，耗時 1.5 秒
           let fadeP = Math.min(timer / 1500.0, 1.0); 
           gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); 
           gemSpriteBottom.alpha = 0; 
@@ -215,7 +236,6 @@ export function setupTablet(app, onSettlement) {
           if (fadeP >= 1.0) { 
             phase = 'IDLE'; 
             gemSpriteBottom.stop(); gemSpriteTop.stop(); 
-            // (7) 叫出結算畫面
             if (onSettlement) onSettlement(); 
           }
         }

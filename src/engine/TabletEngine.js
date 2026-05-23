@@ -3,14 +3,12 @@ import { setupTablet } from './TabletController';
 
 export function createTabletEngine(containerElement, onSettlement) {
   const app = new window.PIXI.Application({
-    // 🌟 修復 1：改為追蹤 React 容器，避免視窗縮放或翻轉時 PIXI 數學坐標跑掉
     resizeTo: containerElement, 
     backgroundColor: 0x050507, 
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
   });
   
-  // 🌟 強制設定 CSS 確保 Canvas 百分之百貼合外層 Div
   app.view.style.position = 'absolute';
   app.view.style.top = '0';
   app.view.style.left = '0';
@@ -26,11 +24,12 @@ export function createTabletEngine(containerElement, onSettlement) {
   });
 
   return {
-    receiveTear: (nx, z) => {
+    // 🌟 核心新增：接收 char 參數
+    receiveTear: (nx, z, char) => {
       const targetX = nx * app.screen.width;
       const normZ = 1.0 - (z / 3.0); 
       const targetY = normZ * app.screen.height; 
-      tabletCtrl.addRipple(targetX, targetY);
+      tabletCtrl.addRipple(targetX, targetY, char); // 🌟 傳遞給水波生成器
     },
     revealGem: (gemType) => { tabletCtrl.revealGem(gemType); },
     monitorFinished: () => { tabletCtrl.monitorFinished(); },

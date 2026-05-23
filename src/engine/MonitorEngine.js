@@ -4,14 +4,13 @@ import { setupMonitor } from './MonitorController';
 
 export function createMonitorEngine(containerElement, getEyeData, videoElement, socket) {
   const app = new window.PIXI.Application({
-    resizeTo: window, // 🌟 關鍵魔法：讓 PIXI 自動貼齊瀏覽器全螢幕大小
+    resizeTo: window, 
     backgroundColor: 0x0a0a0c,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
   });
   containerElement.appendChild(app.view);
 
-  // 紋理快取 (不變)
   const uniqueChars = new Set(WORDS.join('').split(''));
   const charTextures = {};
   uniqueChars.forEach(char => {
@@ -40,7 +39,6 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
       const randomPoint = edgePoints[Math.floor(Math.random() * edgePoints.length)];
       eyeX = randomPoint.x; eyeY = randomPoint.y;
     } else {
-      // 🌟 找不到臉時，根據全螢幕寬高來決定備用生成點
       eyeX = app.screen.width * (isLeftEye ? 0.3 : 0.7) + (isInner ? EYE_OFFSET : -EYE_OFFSET); 
       eyeY = app.screen.height * 0.3; 
     }
@@ -84,11 +82,11 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
       const flipFactor = Math.abs(Math.sin(rotAngle)); 
       drop.sprite.scale.set(drop.baseScale * (0.9 + drop.f * 0.5), drop.baseScale * (0.9 + drop.f * 0.5) * (0.4 + flipFactor * 0.6));
 
-      // 🌟 越界檢查：當文字掉出真正的螢幕底部 app.screen.height
       if (drop.sprite.y > app.screen.height) { 
         socket.emit('monitor-tear-overflow', {
-          nx: drop.sprite.x / app.screen.width, // 🌟 傳送比例：(目前的X / 螢幕總寬)
-          z: drop.z
+          nx: drop.sprite.x / app.screen.width, 
+          z: drop.z,
+          char: drop.char // 🌟 核心新增：把這滴眼淚是什麼字一起送過去
         });
         textContainer.removeChild(drop.sprite); drop.sprite.destroy(); drops.splice(i, 1); 
       }
