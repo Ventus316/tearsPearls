@@ -114,7 +114,7 @@ export function setupTablet(app, onSettlement) {
     if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
     if (phase === 'FADE_IN' && timer < 3000) return false; 
     let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    return dist < 180; 
+    return dist < 30; 
   };
 
   const FPS = 30; 
