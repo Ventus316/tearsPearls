@@ -39,6 +39,10 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`❌ 裝置已中斷連線: ${socket.id}`);
   });
+
+  socket.on('tablet-wake-up', () => socket.broadcast.emit('tablet-wake-up'));
+  socket.on('tablet-sleep', () => socket.broadcast.emit('tablet-sleep'));
+  socket.on('tablet-settlement', () => socket.broadcast.emit('tablet-settlement'));
 });
 
 // 🚀 讓伺服器監聽 3000 連接埠

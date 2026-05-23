@@ -4,12 +4,44 @@ import { WORDS, SETTLEMENT_DESCRIPTIONS, GEM_MAPPING } from '../config/constants
 import { createTabletEngine } from '../engine/TabletEngine'; 
 import { io } from 'socket.io-client';
 
+// 🌟 引入待機動畫影片
+import waitVideo from '../assets/wait_1080p.mp4';
+
 export default function TabletView() {
   const pixiContainer = useRef(null); const engineRef = useRef(null); const socketRef = useRef(null);
-  const [interactionState, setInteractionState] = useState('ready'); 
+  
+  const [interactionState, setInteractionState] = useState('standby'); 
   const [selectedWords, setSelectedWords] = useState([]); 
+  const idleTimerRef = useRef(null);
+
   const isReady = interactionState === 'ready';
   const canCry = isReady && selectedWords.length === 5;
+
+  const startIdleTimer = () => {
+    clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      setInteractionState('standby');
+      setSelectedWords([]); 
+      if (socketRef.current) socketRef.current.emit('tablet-sleep'); 
+    }, 60000); 
+  };
+
+  // 🌟 修復核心 1：只要摸到平板，就瘋狂向大螢幕同步「我醒著」的狀態
+  const handleGlobalInteraction = () => {
+    // 正在播放動畫或結算畫面時，不干擾計時
+    if (interactionState === 'playing') return;
+
+    if (interactionState === 'standby') {
+      setInteractionState('ready');
+    }
+    
+    // 🌟 不管是不是從 standby 醒來，只要摸到螢幕就發送 wake-up 同步訊號
+    if (socketRef.current) {
+      socketRef.current.emit('tablet-wake-up');
+    }
+    
+    startIdleTimer();
+  };
 
   useEffect(() => {
     // 🚨 佈展時請將 IP 替換為電腦的真實 IPv4
@@ -17,9 +49,10 @@ export default function TabletView() {
     socketRef.current = io(SERVER_IP);
 
     if (pixiContainer.current && !engineRef.current) {
-      // 🌟 核心修改：將結算畫面的觸發器交給 PIXI 控制
       engineRef.current = createTabletEngine(pixiContainer.current, () => {
         setInteractionState('finished');
+        if (socketRef.current) socketRef.current.emit('tablet-settlement'); // 結算時通知大螢幕淡入待機圖
+        startIdleTimer(); 
       });
     }
 
@@ -27,12 +60,14 @@ export default function TabletView() {
       if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z); 
     });
     
-    // 🌟 核心修改：收到大螢幕完畢通知時，不再直接切換畫面，而是告訴 PIXI 引擎「大螢幕好了」
     socketRef.current.on('tablet-show-finished', () => {
       if (engineRef.current) engineRef.current.monitorFinished();
     });
 
+    startIdleTimer();
+
     return () => { 
+      clearTimeout(idleTimerRef.current);
       if (socketRef.current) socketRef.current.disconnect(); 
       if (engineRef.current) {
         engineRef.current.destroy();
@@ -59,13 +94,20 @@ export default function TabletView() {
   const handleCrying = () => { 
     if (selectedWords.length !== 5) return;
     setInteractionState('playing'); 
+    clearTimeout(idleTimerRef.current); 
     if (socketRef.current && engineRef.current) {
       socketRef.current.emit('tablet-trigger-crying', selectedWords);
       engineRef.current.revealGem(determineGemType(selectedWords));
     }
   };
 
-  const handleTryAgain = () => { setInteractionState('ready'); setSelectedWords([]); };
+  const handleTryAgain = () => { 
+    setInteractionState('ready'); 
+    setSelectedWords([]); 
+    if (socketRef.current) socketRef.current.emit('tablet-wake-up'); 
+    startIdleTimer();
+  };
+
   const getSettlementText = () => {
     if (selectedWords.length === 0) return '沉重的落淚，已淬鍊成不碎的結晶。';
     return SETTLEMENT_DESCRIPTIONS?.[selectedWords[selectedWords.length - 1]] || '沉重的落淚，已淬鍊成不碎的結晶。';
@@ -94,12 +136,25 @@ export default function TabletView() {
   };
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative">
+    <div 
+      className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative"
+      onPointerDown={handleGlobalInteraction}
+    >
+      <video
+        src={waitVideo}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className={`absolute inset-0 w-full h-full object-cover z-50 transition-opacity duration-1000 ${
+          interactionState === 'standby' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      />
+
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-        
-        <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
+        <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' || interactionState === 'standby' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
           
           {interactionState === 'ready' && (
             <div className="flex h-full w-full flex-col">
@@ -157,15 +212,12 @@ export default function TabletView() {
             </div>
           )}
 
-
-          {/* 🌟 結算畫面現在有淡入效果了 */}
           {interactionState === 'finished' && (
             <div className="flex h-full w-full items-center justify-center px-6 z-20 animate-in fade-in duration-1000">
               <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
                 <p className="w-full text-center text-xs font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
                 <div className="mb-4 mt-3 h-[2px] w-full bg-white/20" />
                 
-                {/* 👇 就是這裡！在 className 中加入 whitespace-pre-line 👇 */}
                 <p className="px-4 py-2 text-center text-[15px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90 whitespace-pre-line">
                   {getSettlementText()}
                 </p>
