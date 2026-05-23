@@ -25,6 +25,7 @@ export function setupTablet(app, onSettlement) {
 
   const initGemSprite = (sprite, parent) => {
     sprite.anchor.set(0.5); 
+    // 退回舊版：完全死守平板螢幕的正中央，不加偏移量
     sprite.x = app.screen.width / 2; 
     sprite.y = app.screen.height / 2; 
     sprite.alpha = 0; 
@@ -38,13 +39,13 @@ export function setupTablet(app, onSettlement) {
   const splashContainer = new window.PIXI.Container();
   container.addChild(splashContainer);
   let activeSplashes = []; 
+  
+  let activeRipplesList = []; 
   const sheetCache = {};
 
-  // 🌟 新增：寶石狀態機與計時器
   let phase = 'IDLE';
   let timer = 0;
   let isMonitorDone = false;
-  let activeRipples = 0; // 追蹤畫面上還有沒有水波
 
   const monitorFinished = () => { isMonitorDone = true; };
 
@@ -56,23 +57,28 @@ export function setupTablet(app, onSettlement) {
     const frames = sheetCache[gemType].animations[gemType] || Object.values(sheetCache[gemType].textures);
 
     gemSpriteBottom.textures = frames; gemSpriteTop.textures = frames;
+    gemSpriteBottom.anchor.set(0.5); gemSpriteTop.anchor.set(0.5);
     gemSpriteBottom.play(); gemSpriteTop.play();
     
     gemSpriteBottom.alpha = 0; gemSpriteTop.alpha = 0;
     gemSpriteBottom.scale.set(0.04); gemSpriteTop.scale.set(0.04);
     
-    // 初始化狀態機
     phase = 'DELAY';
     timer = 0;
     isMonitorDone = false;
+    activeRipplesList = []; // 重置水波計數
   };
 
-  // 🌟 修正：碰撞判定邏輯配合狀態機
+  // 🌟 碰撞判定範圍與寶石圖片中心完全一致
   const isHittingGem = (x, y) => {
     if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
-    if (phase === 'FADE_IN' && timer < 3000) return false; // 剛開始淡入時還太小不能砸
+    if (phase === 'FADE_IN' && timer < 3000) return false; 
+    
+    // 依據螢幕正中央進行距離判定
     let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    return dist < 80; 
+    
+    // 將碰撞半徑放大至 180，確保高解析度螢幕也能準確砸出水花
+    return dist < 180; 
   };
 
   const FPS = 30; 
@@ -98,7 +104,8 @@ export function setupTablet(app, onSettlement) {
       return; 
     }
     
-    activeRipples++; // 🌟 產生一個水波，計數器 +1
+    // 在引擎層面紀錄這個水波紋的精確壽命 (最大影格 74 / 30fps = 2460ms)
+    activeRipplesList.push({ timer: 2460 }); 
     
     const dropContainer = new window.PIXI.Container();
     dropContainer.x = x; dropContainer.y = y;
@@ -128,19 +135,22 @@ export function setupTablet(app, onSettlement) {
 
     gsap.delayedCall(maxDurationSeconds + 0.1, () => {
       if (!dropContainer.destroyed) dropContainer.destroy({ children: true });
-      activeRipples--; // 🌟 水波結束，計數器 -1
     });
   };
 
   return { 
     addRipple, revealGem, monitorFinished,
     updateWater: (delta, time) => {
-      // 🌟 核心修正：每一幀強制把視覺寶石鎖死在螢幕正中央 (無論螢幕怎麼縮放)
-      gemSpriteBottom.x = app.screen.width / 2;
-      gemSpriteBottom.y = app.screen.height / 2;
-      gemSpriteTop.x = app.screen.width / 2;
-      gemSpriteTop.y = app.screen.height / 2;
+      // 每一幀死守螢幕正中央
+      const centerX = app.screen.width / 2;
+      const centerY = app.screen.height / 2;
+      
+      gemSpriteBottom.x = centerX;
+      gemSpriteBottom.y = centerY;
+      gemSpriteTop.x = centerX;
+      gemSpriteTop.y = centerY;
 
+      // 1. 更新小水花物理
       for (let i = activeSplashes.length - 1; i >= 0; i--) {
         let p = activeSplashes[i];
         p.vy += 0.4 * delta; p.sprite.x += p.vx * delta; p.sprite.y += p.vy * delta; 
@@ -148,16 +158,22 @@ export function setupTablet(app, onSettlement) {
         if (p.life <= 0) { splashContainer.removeChild(p.sprite); p.sprite.destroy(); activeSplashes.splice(i, 1); }
       }
 
-      // 🌟 嚴謹的寶石生命週期狀態機
+      // 2. 更新圈狀水波紋的生命倒數
+      for (let i = activeRipplesList.length - 1; i >= 0; i--) {
+        activeRipplesList[i].timer -= delta * 16.66;
+        if (activeRipplesList[i].timer <= 0) activeRipplesList.splice(i, 1);
+      }
+
+      // 3. 全新防彈級時間軸狀態機
       if (phase !== 'IDLE') {
         timer += delta * 16.66; 
         
         if (phase === 'DELAY') {
-          // 1. 等待 5 秒 (15秒流淚時間的 1/3)
+          // (1) 等待 5 秒 (流淚 1/3)
           if (timer >= 5000) { phase = 'FADE_IN'; timer = 0; }
         } 
         else if (phase === 'FADE_IN') {
-          // 2. 寶石浮出水面，過程持續 10 秒
+          // (2) 寶石淡入浮現
           let progress = Math.min(timer / 10000, 1.0); 
           let easeP = progress * progress; 
           let currentScale = 0.04 + (easeP * 0.04);
@@ -169,29 +185,37 @@ export function setupTablet(app, onSettlement) {
           if (progress >= 1.0) { phase = 'WAIT_MONITOR'; }
         }
         else if (phase === 'WAIT_MONITOR') {
-          // 3. 確保大螢幕已經發送了掉落完畢的訊號
+          // (3) 確認顯示器「流淚完畢」且畫面上 0 個眼淚
           if (isMonitorDone) { phase = 'WAIT_RIPPLES'; }
         }
         else if (phase === 'WAIT_RIPPLES') {
-          // 4. 等待平板畫面上最後一滴水波跟水花都消失乾淨
-          if (activeSplashes.length === 0 && activeRipples === 0) {
+          // (4) 確認平板上「沒有任何水波紋或水花」
+          if (activeSplashes.length === 0 && activeRipplesList.length === 0) {
             phase = 'SETTLEMENT_DELAY';
             timer = 0;
           }
         }
         else if (phase === 'SETTLEMENT_DELAY') {
-          // 5. 畫面淨空後，讓寶石完美閃耀停留 1.5 秒
-          if (timer >= 1500) { phase = 'FADE_OUT'; timer = 0; }
+          // ⚠️ 防呆攔截：如果這 1.5 秒內網路延遲又噴出水花或水波，立刻退回上一步重新等待清空！
+          if (activeSplashes.length > 0 || activeRipplesList.length > 0) {
+            phase = 'WAIT_RIPPLES';
+          } 
+          // (5) 畫面淨空停留 1.5 秒
+          else if (timer >= 1500) { 
+            phase = 'FADE_OUT'; 
+            timer = 0; 
+          }
         }
         else if (phase === 'FADE_OUT') {
-          // 6. 寶石花 1.5 秒漸隱淡出
+          // (6) 寶石開始淡出，耗時 1.5 秒
           let fadeP = Math.min(timer / 1500.0, 1.0); 
           gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); 
           gemSpriteBottom.alpha = 0; 
+          
           if (fadeP >= 1.0) { 
-            // 7. 動畫徹底結束，通知 React 叫出結算介面
             phase = 'IDLE'; 
             gemSpriteBottom.stop(); gemSpriteTop.stop(); 
+            // (7) 叫出結算畫面
             if (onSettlement) onSettlement(); 
           }
         }
