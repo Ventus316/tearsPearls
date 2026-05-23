@@ -48,6 +48,7 @@
 
 ## 📂 系統架構目錄 (Directory Structure)
 
+```text
 tearsPearls/
 ├── 📂 public/ # 靜態資源 (素材紋理、JSON)
 ├── 📂 src/
@@ -57,6 +58,7 @@ tearsPearls/
 │ └── 📄 App.jsx # 路由分發器 (Router)
 ├── 📄 server.js # Socket.io 通訊中樞 (事件中轉)
 └── 📄 vite.config.js # 建置設定
+```
 
 ## 🚀 部署與運行 (How to Run)
 
