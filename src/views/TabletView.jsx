@@ -16,12 +16,21 @@ export default function TabletView() {
     const SERVER_IP = 'http://192.168.138.1:3000'; 
     socketRef.current = io(SERVER_IP);
 
-    if (pixiContainer.current && !engineRef.current) engineRef.current = createTabletEngine(pixiContainer.current);
+    if (pixiContainer.current && !engineRef.current) {
+      // 🌟 核心修改：將結算畫面的觸發器交給 PIXI 控制
+      engineRef.current = createTabletEngine(pixiContainer.current, () => {
+        setInteractionState('finished');
+      });
+    }
 
     socketRef.current.on('tablet-receive-tear', (data) => {
       if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z); 
     });
-    socketRef.current.on('tablet-show-finished', () => setInteractionState('finished'));
+    
+    // 🌟 核心修改：收到大螢幕完畢通知時，不再直接切換畫面，而是告訴 PIXI 引擎「大螢幕好了」
+    socketRef.current.on('tablet-show-finished', () => {
+      if (engineRef.current) engineRef.current.monitorFinished();
+    });
 
     return () => { 
       if (socketRef.current) socketRef.current.disconnect(); 
@@ -88,63 +97,49 @@ export default function TabletView() {
     <div className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative">
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
-      {/* 💡 調整 1：移除了外層的 p-4 md:p-6 (內距)，讓底板可以直接碰到螢幕邊緣 */}
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
         
-        {/* 💡 調整 2：寬高改為 w-full h-full，並使用 rounded-[64px] 產生完美的大圓角 */}
         <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
           
           {interactionState === 'ready' && (
             <div className="flex h-full w-full flex-col">
               
-              {/* 🌟 頂部超大橢圓計數器 */}
               <div 
                 className="absolute left-1/2 top-0 flex items-end justify-center z-10"
-                style={{ transform: 'translate(-50%, calc(-50% - 175px))' }} 
+                style={{ transform: 'translate(-50%, calc(-50% - 190px))' }} 
               >
                 <div className="flex h-[505px] w-[600px] rounded-[50%] items-end justify-center border-[8px] border-[#e0f8fa] bg-[#fdffff] shadow-[0_0_60px_rgba(214,255,255,0.85)]">
                   <span 
                     className="text-[40px] font-normal tracking-[0.05em] text-[#868999]"
-                    style={{ transform: 'translateY(-5px)' }} 
+                    style={{ transform: 'translateY(-0px)' }} 
                   >
                     {selectedWords.length}/5
                   </span>
                 </div>
               </div>
 
-              {/* 頂部緩衝區 */}
-              <div className="shrink-0 h-[70px] md:h-[110px]"></div>
+              <div className="shrink-0 h-[70px] md:h-[90px]"></div>
 
-              {/* 🌟 核心層次排版區塊 */}
               <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16">
                 
-                {/* ➖ 上方【粗】分隔線 */}
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
 
-                {/* 詞彙區 */}
                 <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
                   {wordRows.map((row, rowIndex) => (
                     <React.Fragment key={rowIndex}>
-                      
                       <div className="grid grid-cols-5 gap-10 mx-10 md:mx-20">
                         {row.map(renderWordButton)}
                       </div>
-                      
-                      {/* ➖ 中間【細】分隔線 */}
                       {rowIndex < wordRows.length - 1 && (
                         <div className="w-full h-[1px] md:h-[1.5px] bg-[#e0f8fa]/20 rounded-full my-1"></div>
                       )}
-
                     </React.Fragment>
                   ))}
                 </div>
 
-                {/* ➖ 下方【粗】分隔線 */}
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mt-3 md:mt-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
-
               </div>
 
-              {/* 🌟 底部常駐按鈕 */}
               <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-8 md:pt-3 md:pb-12">
                 <button
                   onClick={handleCrying}
@@ -162,9 +157,9 @@ export default function TabletView() {
             </div>
           )}
 
-          {/* 結算畫面 */}
+          {/* 🌟 結算畫面現在有淡入效果了 */}
           {interactionState === 'finished' && (
-            <div className="flex h-full w-full items-center justify-center px-6 z-20">
+            <div className="flex h-full w-full items-center justify-center px-6 z-20 animate-in fade-in duration-1000">
               <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
                 <p className="w-full text-center text-xs font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
                 <div className="mb-4 mt-3 h-[2px] w-full bg-white/20" />

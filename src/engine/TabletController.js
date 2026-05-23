@@ -1,7 +1,7 @@
 // src/engine/TabletController.js
 import { gsap } from 'gsap'; 
 
-export function setupTablet(app) {
+export function setupTablet(app, onSettlement) {
   const container = new window.PIXI.Container();
   app.stage.addChild(container);
 
@@ -25,12 +25,10 @@ export function setupTablet(app) {
 
   const initGemSprite = (sprite, parent) => {
     sprite.anchor.set(0.5); 
-    // 🌟 初始化寶石位置到全螢幕的正中央
     sprite.x = app.screen.width / 2; 
     sprite.y = app.screen.height / 2; 
     sprite.alpha = 0; 
-    sprite.scale.set(0.04); // 為了大螢幕稍微放大寶石
-    sprite.animationSpeed = 0.5; 
+    sprite.scale.set(0.04); 
     parent.addChild(sprite);
   };
 
@@ -40,14 +38,17 @@ export function setupTablet(app) {
   const splashContainer = new window.PIXI.Container();
   container.addChild(splashContainer);
   let activeSplashes = []; 
-
-  let isRevealingGem = false;
-  let gemAnimTime = 0; 
-  const GEM_REVEAL_DURATION = 12000; 
   const sheetCache = {};
 
+  // 🌟 新增：寶石狀態機與計時器
+  let phase = 'IDLE';
+  let timer = 0;
+  let isMonitorDone = false;
+  let activeRipples = 0; // 追蹤畫面上還有沒有水波
+
+  const monitorFinished = () => { isMonitorDone = true; };
+
   const revealGem = async (gemType) => {
-    isRevealingGem = false; 
     if (!sheetCache[gemType]) {
       const sheet = await window.PIXI.Assets.load(`/gems/${gemType}.json`);
       sheetCache[gemType] = sheet;
@@ -59,14 +60,19 @@ export function setupTablet(app) {
     
     gemSpriteBottom.alpha = 0; gemSpriteTop.alpha = 0;
     gemSpriteBottom.scale.set(0.04); gemSpriteTop.scale.set(0.04);
-    isRevealingGem = true; gemAnimTime = 0;
+    
+    // 初始化狀態機
+    phase = 'DELAY';
+    timer = 0;
+    isMonitorDone = false;
   };
 
-  // 🌟 判斷是否砸中寶石 (使用全螢幕正中央坐標)
+  // 🌟 修正：碰撞判定邏輯配合狀態機
   const isHittingGem = (x, y) => {
-    if (!isRevealingGem || gemAnimTime < 10000 || gemAnimTime > 18000) return false;
+    if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
+    if (phase === 'FADE_IN' && timer < 3000) return false; // 剛開始淡入時還太小不能砸
     let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    return dist < 80; // 響應大螢幕，擴大判定範圍
+    return dist < 80; 
   };
 
   const FPS = 30; 
@@ -92,12 +98,14 @@ export function setupTablet(app) {
       return; 
     }
     
+    activeRipples++; // 🌟 產生一個水波，計數器 +1
+    
     const dropContainer = new window.PIXI.Container();
     dropContainer.x = x; dropContainer.y = y;
     waterLayer.addChild(dropContainer);
 
     let maxDurationSeconds = 0;
-    const randomScale = 0.1 + Math.random() * 0.15; // 為了大螢幕稍微放大水波
+    const randomScale = 0.1 + Math.random() * 0.15; 
 
     RIPPLE_KEYFRAMES.forEach(data => {
       const textureName = `textImgLone_${data.id}`;
@@ -120,13 +128,19 @@ export function setupTablet(app) {
 
     gsap.delayedCall(maxDurationSeconds + 0.1, () => {
       if (!dropContainer.destroyed) dropContainer.destroy({ children: true });
+      activeRipples--; // 🌟 水波結束，計數器 -1
     });
   };
 
   return { 
-    addRipple, revealGem, 
+    addRipple, revealGem, monitorFinished,
     updateWater: (delta, time) => {
-      // 更新水花與寶石動畫 (邏輯不變，僅微調動畫基數以適應放大版)
+      // 🌟 核心修正：每一幀強制把視覺寶石鎖死在螢幕正中央 (無論螢幕怎麼縮放)
+      gemSpriteBottom.x = app.screen.width / 2;
+      gemSpriteBottom.y = app.screen.height / 2;
+      gemSpriteTop.x = app.screen.width / 2;
+      gemSpriteTop.y = app.screen.height / 2;
+
       for (let i = activeSplashes.length - 1; i >= 0; i--) {
         let p = activeSplashes[i];
         p.vy += 0.4 * delta; p.sprite.x += p.vx * delta; p.sprite.y += p.vy * delta; 
@@ -134,19 +148,52 @@ export function setupTablet(app) {
         if (p.life <= 0) { splashContainer.removeChild(p.sprite); p.sprite.destroy(); activeSplashes.splice(i, 1); }
       }
 
-      if (isRevealingGem) {
-        gemAnimTime += delta * 16.66; 
-        if (gemAnimTime <= 15000) {
-            let progress = Math.min(gemAnimTime / GEM_REVEAL_DURATION, 1.0); 
-            let easeP = progress * progress; 
-            let currentScale = 0.04 + (easeP * 0.04);
-            let crossfadeP = gemAnimTime > 10000 ? Math.min((gemAnimTime - 10000) / 1000.0, 1.0) : 0;
-            gemSpriteBottom.scale.set(currentScale); gemSpriteTop.scale.set(currentScale);
-            gemSpriteBottom.alpha = easeP * (1.0 - crossfadeP); gemSpriteTop.alpha = easeP * crossfadeP;            
-        } else {
-            let fadeP = (gemAnimTime - 15000) / 3000.0; 
-            gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); gemSpriteBottom.alpha = 0; 
-            if (fadeP >= 1.0) { isRevealingGem = false; gemSpriteBottom.stop(); gemSpriteTop.stop(); }
+      // 🌟 嚴謹的寶石生命週期狀態機
+      if (phase !== 'IDLE') {
+        timer += delta * 16.66; 
+        
+        if (phase === 'DELAY') {
+          // 1. 等待 5 秒 (15秒流淚時間的 1/3)
+          if (timer >= 5000) { phase = 'FADE_IN'; timer = 0; }
+        } 
+        else if (phase === 'FADE_IN') {
+          // 2. 寶石浮出水面，過程持續 10 秒
+          let progress = Math.min(timer / 10000, 1.0); 
+          let easeP = progress * progress; 
+          let currentScale = 0.04 + (easeP * 0.04);
+          let crossfadeP = timer > 5000 ? Math.min((timer - 5000) / 5000.0, 1.0) : 0;
+          
+          gemSpriteBottom.scale.set(currentScale); gemSpriteTop.scale.set(currentScale);
+          gemSpriteBottom.alpha = easeP * (1.0 - crossfadeP); gemSpriteTop.alpha = easeP * crossfadeP;            
+          
+          if (progress >= 1.0) { phase = 'WAIT_MONITOR'; }
+        }
+        else if (phase === 'WAIT_MONITOR') {
+          // 3. 確保大螢幕已經發送了掉落完畢的訊號
+          if (isMonitorDone) { phase = 'WAIT_RIPPLES'; }
+        }
+        else if (phase === 'WAIT_RIPPLES') {
+          // 4. 等待平板畫面上最後一滴水波跟水花都消失乾淨
+          if (activeSplashes.length === 0 && activeRipples === 0) {
+            phase = 'SETTLEMENT_DELAY';
+            timer = 0;
+          }
+        }
+        else if (phase === 'SETTLEMENT_DELAY') {
+          // 5. 畫面淨空後，讓寶石完美閃耀停留 1.5 秒
+          if (timer >= 1500) { phase = 'FADE_OUT'; timer = 0; }
+        }
+        else if (phase === 'FADE_OUT') {
+          // 6. 寶石花 1.5 秒漸隱淡出
+          let fadeP = Math.min(timer / 1500.0, 1.0); 
+          gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); 
+          gemSpriteBottom.alpha = 0; 
+          if (fadeP >= 1.0) { 
+            // 7. 動畫徹底結束，通知 React 叫出結算介面
+            phase = 'IDLE'; 
+            gemSpriteBottom.stop(); gemSpriteTop.stop(); 
+            if (onSettlement) onSettlement(); 
+          }
         }
       }
     }
