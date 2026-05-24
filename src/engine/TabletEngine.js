@@ -45,7 +45,7 @@ export function createTabletEngine(containerElement, onSettlement) {
     },
     /**
      * 啟動寶石顯影動畫
-     * @param {string} gemType - 寶石種類 (pearl, diamond, quartz, opal, lapis)
+     * @param {string} gemType - 寶石種類 (pearl, diamond, crystal, opal, lapis)
      */
     revealGem: (gemType) => { 
       tabletCtrl.revealGem(gemType); 

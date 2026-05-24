@@ -109,7 +109,7 @@ export default function TabletView() {
   const determineGemType = (userWords) => {
     if (!userWords || userWords.length === 0) return 'diamond'; 
     
-    const counts = { pearl: 0, diamond: 0, quartz: 0, opal: 0, lapis: 0 };
+    const counts = { pearl: 0, diamond: 0, crystal: 0, opal: 0, lapis: 0 };
     
     userWords.forEach(word => { 
       for (const [gem, wordsList] of Object.entries(GEM_MAPPING)) { 

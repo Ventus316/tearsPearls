@@ -93,6 +93,22 @@ export function setupTablet(app, onSettlement) {
     gemSpriteTop.textures = frames;
     gemSpriteBottom.anchor.set(0.5); 
     gemSpriteTop.anchor.set(0.5);
+
+    // ==========================================
+    // 🌟 寶石旋轉速度控制核心
+    // ==========================================
+    // 參數設定：你希望寶石「轉完整整一圈」需要花幾秒？
+    const secondsPerRotation = 2.0; // 假設設定轉一圈 2 秒 (數字越大轉越慢)
+    
+    // 計算公式：瀏覽器預設每秒跑 60 幀。
+    // (圖片總張數) / (60幀 * 你要的秒數) = PIXI 需要的 animationSpeed
+    const calculatedSpeed = frames.length / (60 * secondsPerRotation);
+    
+    // 套用計算出來的播放速度
+    gemSpriteBottom.animationSpeed = calculatedSpeed;
+    gemSpriteTop.animationSpeed = calculatedSpeed;
+    // ==========================================
+
     gemSpriteBottom.play(); 
     gemSpriteTop.play();
     
@@ -228,7 +244,7 @@ export function setupTablet(app, onSettlement) {
         else if (phase === 'FADE_IN') {
           let progress = Math.min(timer / 10000, 1.0); 
           let easeP = progress * progress; 
-          let currentScale = 0.04 + (easeP * 0.04);
+          let currentScale = 0.04 + (easeP * 0.2);
           let crossfadeP = timer > 5000 ? Math.min((timer - 5000) / 5000.0, 1.0) : 0;
           
           gemSpriteBottom.scale.set(currentScale); 
