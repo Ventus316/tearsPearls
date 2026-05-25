@@ -20,7 +20,7 @@ export default function MonitorView() {
   const [isStandby, setIsStandby] = useState(true); 
 
   useEffect(() => {
-    socketRef.current = io('SERVER_IP');
+    socketRef.current = io(SERVER_IP);
     
     socketRef.current.on('monitor-start-crying', (selectedWords) => {
       setIsStandby(false); 

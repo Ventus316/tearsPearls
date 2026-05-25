@@ -5,6 +5,14 @@ import { createTabletEngine } from '../engine/TabletEngine';
 import { io } from 'socket.io-client';
 import waitVideo from '../assets/wait_1080p.mp4';
 
+const GEM_NAMES = {
+  pearl: '珍珠',
+  diamond: '鑽石',
+  crystal: '白水晶',
+  opal: '蛋白石',
+  lapis: '青金石'
+};
+
 const PRECALCULATED_WORD_ROWS = [];
 for (let i = 0; i < WORDS.length; i += 5) {
   PRECALCULATED_WORD_ROWS.push(WORDS.slice(i, i + 5));
@@ -21,6 +29,7 @@ export default function TabletView() {
   
   const [interactionState, setInteractionState] = useState('standby'); 
   const [selectedWords, setSelectedWords] = useState([]); 
+  const [finalGemType, setFinalGemType] = useState('diamond');
   const idleTimerRef = useRef(null);
 
   const isReady = interactionState === 'ready';
@@ -135,6 +144,9 @@ export default function TabletView() {
     
     if (socketRef.current && engineRef.current) {
       socketRef.current.emit('tablet-trigger-crying', selectedWords);
+
+      const calculatedGem = determineGemType(selectedWords);
+      setFinalGemType(calculatedGem);
       engineRef.current.revealGem(determineGemType(selectedWords));
     }
   };
@@ -147,8 +159,14 @@ export default function TabletView() {
   };
 
   const getSettlementText = () => {
-    if (selectedWords.length === 0) return '沉重的落淚，已淬鍊成不碎的結晶。';
-    return SETTLEMENT_DESCRIPTIONS?.[selectedWords[selectedWords.length - 1]] || '沉重的落淚，已淬鍊成不碎的結晶。';
+    const gemName = GEM_NAMES[finalGemType] || '結晶';
+    const fallbackText = '沉重的落淚，已淬鍊成不碎的結晶。';
+    
+    const description = (selectedWords.length === 0) 
+      ? fallbackText 
+      : (SETTLEMENT_DESCRIPTIONS?.[selectedWords[selectedWords.length - 1]] || fallbackText);
+
+    return `【 ${gemName} 】\n\n${description}`;
   };
 
   const renderWordButton = (word) => {
