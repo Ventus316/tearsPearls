@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createMonitorEngine } from '../engine/MonitorEngine'; 
 import { io } from 'socket.io-client';
 import waitImage from '../assets/wait_monitor.jpg';
+import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION } from '../config/constants';
 
 /**
  * 展場大螢幕視圖 (Monitor View)
@@ -122,15 +123,12 @@ export default function MonitorView() {
       {/* 隱藏在背景，專門提供 UV 偏移數學運算給待機圖片使用 */}
       <svg width="0" height="0" className="absolute pointer-events-none">
         <filter id="canvas-wind" x="-20%" y="-20%" width="140%" height="140%">
-          {/* 1. 調整波動頻率 (baseFrequency) */}
-          {/* 生成大面積的平滑流動噪點 (baseFrequency 數值越小，波浪越寬廣柔軟) */}
-          <feTurbulence type="fractalNoise" baseFrequency="0.003 0.005" numOctaves="1" result="noise" />
-          {/* 2. 調整波動強度 (scale) */}
-          {/* values="3; 50; 3" 中的 "18" 是最大偏移量。 */}
-          {/* 想要更劇烈的呼吸感，可以把中間的數字加大到 30~50 */}
-          {/* 利用 scale 動畫，製造 UV 偏移的強弱呼吸感 (從微弱的 3 膨脹到 18 再回到 3) */}
+          {/* 🌟 1. 綁定波動頻率 (baseFrequency) */}
+          <feTurbulence type="fractalNoise" baseFrequency={STANDBY_WIND_FREQUENCY} numOctaves="1" result="noise" />
+          
+          {/* 🌟 2. 綁定波動強度 (values) 與 呼吸循環時間 (dur) */}
           <feDisplacementMap in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G">
-            <animate attributeName="scale" values="5; 60; 5" dur="10s" repeatCount="indefinite" />
+            <animate attributeName="scale" values={STANDBY_WIND_SCALE_VALUES} dur={STANDBY_WIND_DURATION} repeatCount="indefinite" />
           </feDisplacementMap>
         </filter>
       </svg>

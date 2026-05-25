@@ -87,3 +87,16 @@ export const GEM_ROTATION_SPEEDS = {
 export const GEM_INITIAL_SCALE = 0.04;    // 寶石剛出場時的極小初始尺寸 (Scale)
 export const GEM_FINAL_SCALE = 0.24;      // 寶石動畫結束後的最終尺寸 (原本為 0.04 + 0.2)
 export const GEM_HITBOX_RADIUS = 30;      // 寶石判定水花噴發的碰撞半徑 (像素)
+
+// ==========================================
+// 💧 水波紋文字視覺設定 (Ripple Text Visual Settings)
+// ==========================================
+export const RIPPLE_BASE_SCALE = 0.1;      // 水波紋文字的基礎縮放大小
+export const RIPPLE_RANDOM_SCALE = 0.15;   // 水波紋文字的隨機放大變數 (最終大小 = 基礎 + 隨機數 * 此變數)
+
+// ==========================================
+// 🌬️ 顯示器待機畫面呼吸特效 (Monitor Standby Displacement Settings)
+// ==========================================
+export const STANDBY_WIND_FREQUENCY = "0.003 0.005"; // 波動頻率 (數值越小，波浪越寬廣柔軟)
+export const STANDBY_WIND_SCALE_VALUES = "5; 60; 5"; // 波動強度變化 (最小值; 最大值; 最小值)
+export const STANDBY_WIND_DURATION = "10s";          // 一次呼吸循環的時間

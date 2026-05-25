@@ -5,7 +5,9 @@ import {
   GEM_ROTATION_SPEEDS, 
   GEM_INITIAL_SCALE, 
   GEM_FINAL_SCALE, 
-  GEM_HITBOX_RADIUS 
+  GEM_HITBOX_RADIUS,
+  RIPPLE_BASE_SCALE,
+  RIPPLE_RANDOM_SCALE
 } from '../config/constants';
 
 /**
@@ -175,7 +177,7 @@ export function setupTablet(app, onSettlement) {
     waterLayer.addChild(dropContainer);
 
     let maxDurationSeconds = 0;
-    const randomScale = 0.1 + Math.random() * 0.15; 
+    const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
 
     // 使用 GSAP 依序播放 8 張序列圖，製造水波擴散感
     RIPPLE_KEYFRAMES.forEach(data => {
