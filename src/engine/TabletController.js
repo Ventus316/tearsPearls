@@ -1,6 +1,6 @@
 // src/engine/TabletController.js
 import { gsap } from 'gsap'; 
-import { WORDS } from '../config/constants';
+import { WORDS, GEM_ROTATION_SPEEDS } from '../config/constants';
 
 /**
  * 平板視覺控制器 (Tablet Controller)
@@ -97,11 +97,11 @@ export function setupTablet(app, onSettlement) {
     // ==========================================
     // 🌟 寶石旋轉速度控制核心
     // ==========================================
-    // 參數設定：你希望寶石「轉完整整一圈」需要花幾秒？
-    const secondsPerRotation = 2.0; // 假設設定轉一圈 2 秒 (數字越大轉越慢)
+    // 動態從 constants.js 讀取該寶石的專屬旋轉秒數 (若發生異常則 fallback 預設為 2.0 秒)
+    const secondsPerRotation = GEM_ROTATION_SPEEDS[gemType] || 2.0; 
     
     // 計算公式：瀏覽器預設每秒跑 60 幀。
-    // (圖片總張數) / (60幀 * 你要的秒數) = PIXI 需要的 animationSpeed
+    // (圖片總張數) / (60幀 * 專屬秒數) = PIXI 需要的 animationSpeed
     const calculatedSpeed = frames.length / (60 * secondsPerRotation);
     
     // 套用計算出來的播放速度
