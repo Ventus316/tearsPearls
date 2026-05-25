@@ -1,6 +1,12 @@
 // src/engine/TabletController.js
 import { gsap } from 'gsap'; 
-import { WORDS, GEM_ROTATION_SPEEDS } from '../config/constants';
+import { 
+  WORDS, 
+  GEM_ROTATION_SPEEDS, 
+  GEM_INITIAL_SCALE, 
+  GEM_FINAL_SCALE, 
+  GEM_HITBOX_RADIUS 
+} from '../config/constants';
 
 /**
  * 平板視覺控制器 (Tablet Controller)
@@ -57,8 +63,8 @@ export function setupTablet(app, onSettlement) {
     sprite.anchor.set(0.5); 
     sprite.x = app.screen.width / 2; 
     sprite.y = app.screen.height / 2; 
-    sprite.alpha = 0; 
-    sprite.scale.set(0.04); 
+    sprite.alpha = 0;
+    sprite.scale.set(GEM_INITIAL_SCALE); 
     parent.addChild(sprite);
   };
 
@@ -91,8 +97,8 @@ export function setupTablet(app, onSettlement) {
 
     gemSpriteBottom.textures = frames; 
     gemSpriteTop.textures = frames;
-    gemSpriteBottom.anchor.set(0.5); 
-    gemSpriteTop.anchor.set(0.5);
+    gemSpriteBottom.anchor.set(GEM_INITIAL_SCALE); 
+    gemSpriteTop.anchor.set(GEM_INITIAL_SCALE);
 
     // ==========================================
     // 🌟 寶石旋轉速度控制核心
@@ -130,7 +136,7 @@ export function setupTablet(app, onSettlement) {
     if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
     if (phase === 'FADE_IN' && timer < 3000) return false; 
     let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    return dist < 30; 
+    return dist < GEM_HITBOX_RADIUS; 
   };
 
   const FPS = 30; 
@@ -244,7 +250,7 @@ export function setupTablet(app, onSettlement) {
         else if (phase === 'FADE_IN') {
           let progress = Math.min(timer / 10000, 1.0); 
           let easeP = progress * progress; 
-          let currentScale = 0.04 + (easeP * 0.2);
+          let currentScale = GEM_INITIAL_SCALE + (easeP * (GEM_FINAL_SCALE - GEM_INITIAL_SCALE));
           let crossfadeP = timer > 5000 ? Math.min((timer - 5000) / 5000.0, 1.0) : 0;
           
           gemSpriteBottom.scale.set(currentScale); 
