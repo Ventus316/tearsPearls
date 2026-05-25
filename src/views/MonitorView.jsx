@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createMonitorEngine } from '../engine/MonitorEngine'; 
 import { io } from 'socket.io-client';
 import waitImage from '../assets/wait_monitor.jpg';
-import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION } from '../config/constants';
+import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION, SERVER_IP } from '../config/constants';
 
 /**
  * 展場大螢幕視圖 (Monitor View)
@@ -20,7 +20,7 @@ export default function MonitorView() {
   const [isStandby, setIsStandby] = useState(true); 
 
   useEffect(() => {
-    socketRef.current = io('http://192.168.138.1:3000');
+    socketRef.current = io('SERVER_IP');
     
     socketRef.current.on('monitor-start-crying', (selectedWords) => {
       setIsStandby(false); 

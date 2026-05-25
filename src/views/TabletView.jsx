@@ -1,6 +1,6 @@
 // src/views/TabletView.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { WORDS, SETTLEMENT_DESCRIPTIONS, GEM_MAPPING } from '../config/constants';
+import { WORDS, SETTLEMENT_DESCRIPTIONS, GEM_MAPPING, SERVER_IP } from '../config/constants';
 import { createTabletEngine } from '../engine/TabletEngine'; 
 import { io } from 'socket.io-client';
 import waitVideo from '../assets/wait_1080p.mp4';
@@ -58,7 +58,6 @@ export default function TabletView() {
   };
 
   useEffect(() => {
-    const SERVER_IP = 'http://192.168.138.1:3000'; 
     socketRef.current = io(SERVER_IP);
 
     if (pixiContainer.current && !engineRef.current) {
