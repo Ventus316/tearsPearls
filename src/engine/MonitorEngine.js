@@ -53,10 +53,10 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
   let wasActive = false; 
   let currentWordPool = WORDS;
 
-  /**
-   * 💧 生成一段詞彙的掉落隊列
-   */
-  const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
+    /**
+    * 💧 生成一段詞彙的掉落隊列
+    */
+    const spawnWordFlow = (userWords, isInner = Math.random() > 0.5, sizeScale = 1.0) => {
     const pool = userWords && userWords.length > 0 ? userWords : WORDS;
     const word = pool[Math.floor(Math.random() * pool.length)];
     const chars = word.split('');
@@ -64,22 +64,20 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
     const eyeData = getEyeData(); 
     let eyeX, eyeY;
     
-    // 依據 AI 臉部特徵點定位起始座標
     if (eyeData && eyeData.leftLowerEdge && eyeData.rightLowerEdge) {
       const edgePoints = isLeftEye ? eyeData.leftLowerEdge : eyeData.rightLowerEdge;
       const randomPoint = edgePoints[Math.floor(Math.random() * edgePoints.length)];
       eyeX = randomPoint.x; 
       eyeY = randomPoint.y;
     } else {
-      // 若無臉部資料，則從預設位置生成
       eyeX = app.screen.width * (isLeftEye ? 0.3 : 0.7) + (isInner ? EYE_OFFSET : -EYE_OFFSET); 
       eyeY = app.screen.height * 0.3; 
     }
 
-    // 將字元排入隊列，製造連續掉落的瀑布感
     chars.forEach((char, index) => { 
       dropQueue.push({ 
         char, 
+        word, // 🌟 確保把完整詞彙記下來
         x: eyeX, 
         y: eyeY, 
         triggerFrame: frameCounter + (index * WORD_SPAWN_INTERVAL), 
@@ -91,7 +89,7 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
   /**
    * 💧 實體化單一字元，並賦予初始物理屬性
    */
-  const spawnSingleChar = (char, startX, startY, scale) => {
+  const spawnSingleChar = (char, word, startX, startY, scale) => {
     const dropSprite = new window.PIXI.Sprite(charTextures[char]);
     dropSprite.anchor.set(0.5); 
     dropSprite.position.set(startX, startY);
@@ -108,6 +106,7 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
     drops.push({ 
       sprite: dropSprite, 
       char, 
+      parentWord: word,
       baseScale: depthScale, 
       vx: (Math.random() - 0.5) * BASE_VELOCITY_X, 
       vy: (Math.random() * 0.1 + 1) * (0.8 + depthScale * 0.2), 
@@ -154,7 +153,7 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
     for (let i = dropQueue.length - 1; i >= 0; i--) { 
       if (frameCounter >= dropQueue[i].triggerFrame) { 
         const item = dropQueue[i]; 
-        spawnSingleChar(item.char, item.x, item.y, item.scale); 
+        spawnSingleChar(item.char, item.word, item.x, item.y, item.scale); 
         dropQueue.splice(i, 1); 
       } 
     }
@@ -184,7 +183,8 @@ export function createMonitorEngine(containerElement, getEyeData, videoElement, 
         socket.emit('monitor-tear-overflow', {
           nx: drop.sprite.x / app.screen.width,  // 傳送標準化 X 座標 (0.0 ~ 1.0)
           z: drop.z,                             // 傳送 Z 軸深度
-          char: drop.char                        // 傳送該字元，以便平板匹配水波貼圖
+          char: drop.char,                        // 傳送該字元，以便平板匹配水波貼圖
+          word: drop.parentWord
         });
         
         textContainer.removeChild(drop.sprite); 

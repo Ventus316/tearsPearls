@@ -86,7 +86,7 @@ export default function TabletView() {
 
     // 📥 監聽大螢幕發送的眼淚座標與字元
     socketRef.current.on('tablet-receive-tear', (data) => {
-      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char);
+      if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char, data.word);
     });
     
     // 📥 監聽大螢幕動畫結束訊號

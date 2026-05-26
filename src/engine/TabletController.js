@@ -31,7 +31,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     jsonData.forEach(data => {
       const rect = new window.PIXI.Rectangle(data.x, data.y, data.width, data.height);
       // 自動擷取檔名尾部的數字作為 Frame ID (例如 "textImgLone_1" -> "1")
-      const frameId = data.name.split('_').pop(); 
+      const frameId = String(parseInt(data.name.split('_').pop(), 10));
       rippleTextures['fallback'][frameId] = new window.PIXI.Texture(baseTexture, rect);
     });
   }).catch(e => console.warn("Fallback ripple missing:", e));
@@ -40,18 +40,24 @@ export function setupTablet(app, onSettlement, onPlaySound) {
   // 2. 動態載入 20 個詞彙的專屬水波紋
   // ==========================================
   WORDS.forEach(word => {
-    fetch(`/textImg/${word}.json`).then(res => {
+    // 🌟 加入 URL 安全編碼，防止中文檔名讀取失敗
+    const encodedWord = encodeURIComponent(word);
+
+    fetch(`/textImg/${encodedWord}.json`).then(res => {
       if (!res.ok) throw new Error(`Missing ${word}.json`);
       return res.json();
     }).then(async jsonData => {
-      const baseTexture = await window.PIXI.Assets.load(`/textImg/${word}.png`);
+      const baseTexture = await window.PIXI.Assets.load(`/textImg/${encodedWord}.png`);
       rippleTextures[word] = {};
       jsonData.forEach(data => {
         const rect = new window.PIXI.Rectangle(data.x, data.y, data.width, data.height);
-        const frameId = data.name.split('_').pop();
+        const frameId = String(parseInt(data.name.split('_').pop(), 10));
         rippleTextures[word][frameId] = new window.PIXI.Texture(baseTexture, rect);
       });
-    }).catch(() => { /* 若素材尚未補齊則靜默忽略，交由 Fallback 處理 */ });
+    }).catch((err) => { 
+      // 🌟 把錯誤印出來，如果真的讀不到圖，按 F12 就能立刻知道是哪個字漏了
+      console.warn(`[水波紋警告] 無法載入 ${word}:`, err); 
+    });
   });
 
   const waterLayer = new window.PIXI.Container();

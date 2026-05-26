@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixiJS 文字環繞長相微調</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; background-color: #050507; overflow: hidden; }
+    #canvas-container { width: 100vw; height: 100vh; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    // 1. 初始化全螢幕 PixiJS 畫布
+    const containerElement = document.getElementById('canvas-container');
+    const app = new PIXI.Application({
+      resizeTo: window,
+      backgroundColor: 0x050507,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    });
+    containerElement.appendChild(app.view);
+
+    let textCircleContainer = null;
+
+    /**
+     * 2. 實作環狀排列函數
+     * @param {string} word - 要環繞的詞彙 (如: '孤單')
+     * @param {number} centerX - 圓心 X
+     * @param {number} centerY - 圓心 Y
+     * @param {number} radius - 圓圈半徑
+     * @param {number} scale - 文字縮放比例
+     */
+    function createTextCircle(word, centerX, centerY, radius, scale) {
+      const circleContainer = new PIXI.Container();
+      circleContainer.position.set(centerX, centerY);
+
+      const chars = word.split('');
+      
+      // 🛠️ 【參數調校區 A：字的密度】
+      // 調整這個數字可以控制圓圈上「字的總顆數」。數字越大越密集、越小越稀疏
+      const totalChars = 40; 
+      
+      // 🛠️ 【參數調校區 B：字體視覺風格】
+      const textStyle = new PIXI.TextStyle({
+        fontFamily: '"DFLiHeiti-Light", "DFHeiti-Light", "STHeitiTC-Light", "PingFang TC", "Microsoft JhengHei", sans-serif',
+        fontSize: 30,         // 字體大小
+        fill: '#ffffff',      // 字體顏色
+        fontWeight: '300',    // 細體字重
+        dropShadow: true,     // 開啟發光發亮陰影
+        dropShadowColor: '#ffffff',
+        dropShadowBlur: 6,
+        dropShadowDistance: 0,
+        dropShadowAlpha: 0.5
+      });
+
+      for (let i = 0; i < totalChars; i++) {
+        const char = chars[i % chars.length];
+        const angle = (i / totalChars) * Math.PI * 2;
+
+        const textSprite = new PIXI.Text(char, textStyle);
+        textSprite.anchor.set(0.5); // 確保字體正中心旋轉
+        textSprite.scale.set(scale);
+
+        // 🧮 極座標數學計算
+        textSprite.x = Math.cos(angle) * radius;
+        textSprite.y = Math.sin(angle) * radius;
+
+        // 🔄 角度公式：確保字頭指向圓心
+        textSprite.rotation = angle + Math.PI + Math.PI / 2;
+
+        circleContainer.addChild(textSprite);
+      }
+
+      return circleContainer;
+    }
+
+    /**
+     * 3. 渲染與參數調校核心
+     */
+    function render() {
+      // 每次重繪前先清理舊的容器，避免重疊
+      if (textCircleContainer) {
+        app.stage.removeChild(textCircleContainer);
+        textCircleContainer.destroy({ children: true });
+      }
+
+      // 取得畫布的正中心作為圓心
+      const centerX = app.screen.width / 2;
+      const centerY = app.screen.height / 2;
+      
+      // 🛠️ 【參數調校區 C：圓圈尺寸與縮放】
+      // 格式：createTextCircle(詞彙, 圓心X, 圓心Y, 半徑, 縮放比例)
+      const radius = 180;       // 你可以隨意修改這個半徑像素值 (例如: 150, 200)
+      const textScale = 1.0;    // 你可以微調字體縮放比例 (例如: 0.8, 1.2)
+      
+      textCircleContainer = createTextCircle('孤單', centerX, centerY, radius, textScale);
+      app.stage.addChild(textCircleContainer);
+    }
+
+    // 視窗大小改變時自動防呆重置置中
+    window.addEventListener('resize', () => {
+      app.renderer.resize(window.innerWidth, window.innerHeight);
+      render();
+    });
+
+    // 啟動渲染
+    render();
+  </script>
+</body>
+</html>

@@ -36,11 +36,12 @@ export function createTabletEngine(containerElement, onSettlement, onPlaySound) 
      * @param {number} z - Z 軸深度 (決定 Y 軸落點與水波縮放)
      * @param {string} char - 觸發的字元 (用於匹配對應的水波貼圖)
      */
-    receiveTear: (nx, z, char) => {
+    receiveTear: (nx, z, char, word) => {
       const targetX = nx * app.screen.width;
       const normZ = 1.0 - (z / 3.0); 
       const targetY = normZ * app.screen.height; 
-      tabletCtrl.addRipple(targetX, targetY, char); 
+      console.log("收到眼淚:", word);
+      tabletCtrl.addRipple(targetX, targetY, word || char);
     },
     /**
      * 啟動寶石顯影動畫
