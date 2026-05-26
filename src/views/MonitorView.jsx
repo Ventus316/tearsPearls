@@ -1,7 +1,9 @@
 // src/views/MonitorView.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { createMonitorEngine } from '../engine/MonitorEngine'; 
 import { io } from 'socket.io-client';
+import { Howl } from 'howler';
+
+import { createMonitorEngine } from '../engine/MonitorEngine'; 
 import waitImage from '../assets/wait_monitor.jpg';
 import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION, SERVER_IP } from '../config/constants';
 
@@ -22,9 +24,38 @@ export default function MonitorView() {
   useEffect(() => {
     socketRef.current = io(SERVER_IP);
     
+    // ==========================================
+    // 🎵 初始化三種層次的水滴音效 (Howler.js)
+    // ==========================================
+    const dropSmallSound = new Howl({ 
+      src: ['/audio/drop_small.mp3'], 
+      html5: false, 
+      volume: 0.5 // 小水滴降低音量，製造細碎感
+    });
+
+    const dropMidSound = new Howl({ 
+      src: ['/audio/drop_mid.mp3'], 
+      html5: false, 
+      volume: 0.8 // 中水滴標準音量
+    });
+
+    const dropLargeSound = new Howl({ 
+      src: ['/audio/drop_large.mp3'], 
+      html5: false, 
+      volume: 1.0 // 大水滴全音量輸出，保留重低音共鳴
+    });
+
+    // 🎵 監聽平板傳來的播放訊號
+    socketRef.current.on('monitor-play-sound', (soundType) => {
+      if (soundType === 'drop_small') dropSmallSound.play();
+      else if (soundType === 'drop_mid') dropMidSound.play();
+      else if (soundType === 'drop_large') dropLargeSound.play();
+    });
+
     socketRef.current.on('monitor-start-crying', (selectedWords) => {
-      setIsStandby(false); 
-      if (engineRef.current) engineRef.current.triggerCrying(selectedWords);
+      if (engineRef.current) {
+        engineRef.current.triggerCrying(selectedWords);
+      }
     });
 
     socketRef.current.on('tablet-wake-up', () => setIsStandby(false));

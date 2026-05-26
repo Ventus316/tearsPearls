@@ -74,7 +74,14 @@ export default function TabletView() {
         setInteractionState('finished');
         if (socketRef.current) socketRef.current.emit('tablet-settlement');
         startIdleTimer(); 
-      });
+      },
+        // 🌟 新增第三個參數：透過 Socket 發送音效播放指令
+        (soundType) => {
+          if (socketRef.current) {
+            socketRef.current.emit('tablet-play-sound', soundType);
+          }
+        }
+      );
     }
 
     // 📥 監聽大螢幕發送的眼淚座標與字元

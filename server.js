@@ -34,6 +34,11 @@ io.on('connection', (socket) => {
   socket.on('tablet-sleep', () => socket.broadcast.emit('tablet-sleep'));
   socket.on('tablet-settlement', () => socket.broadcast.emit('tablet-settlement'));
 
+  // 5. 🔊 音效連動：接收平板的發聲指令，並轉發給顯示器主機
+  socket.on('tablet-play-sound', (soundType) => {
+    socket.broadcast.emit('monitor-play-sound', soundType);
+  });
+
   // 斷線處理
   socket.on('disconnect', () => {
     console.log(`❌ [斷線] Socket ID: ${socket.id}`);

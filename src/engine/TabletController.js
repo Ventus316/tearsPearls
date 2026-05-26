@@ -14,7 +14,7 @@ import {
  * 平板視覺控制器 (Tablet Controller)
  * 負責：動態載入水波紋素材、GSAP 水波紋動畫生成、粒子水花物理、以及結算動畫狀態機。
  */
-export function setupTablet(app, onSettlement) {
+export function setupTablet(app, onSettlement, onPlaySound) {
   const container = new window.PIXI.Container();
   app.stage.addChild(container);
 
@@ -169,7 +169,29 @@ export function setupTablet(app, onSettlement) {
       return; 
     }
     
-    // 記錄水波存活時間 (用於狀態機判斷水面是否平靜)
+    // ==========================================
+    // 🌟 動態判斷水波大小與發送對應音效
+    // ==========================================
+    // 1. 先計算出這次水波紋的最終大小
+    const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
+
+    // 2. 利用常數將浮動範圍 (RIPPLE_RANDOM_SCALE) 切成三等分，求出兩個臨界值
+    const tierSize = RIPPLE_RANDOM_SCALE / 3;
+    const thresholdSmall = RIPPLE_BASE_SCALE + tierSize;       // 小與中的界線
+    const thresholdMid = RIPPLE_BASE_SCALE + (tierSize * 2);   // 中與大的界線
+
+    // 3. 判斷落點並發送對應音效名稱給大螢幕
+    if (onPlaySound) {
+      if (randomScale < thresholdSmall) {
+        onPlaySound('drop_small');
+      } else if (randomScale < thresholdMid) {
+        onPlaySound('drop_mid');
+      } else {
+        onPlaySound('drop_large');
+      }
+    }
+
+    // 記錄水波存活時間
     activeRipplesList.push({ timer: 2460 }); 
     
     const dropContainer = new window.PIXI.Container();
@@ -177,19 +199,18 @@ export function setupTablet(app, onSettlement) {
     waterLayer.addChild(dropContainer);
 
     let maxDurationSeconds = 0;
-    const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
 
-    // 使用 GSAP 依序播放 8 張序列圖，製造水波擴散感
+    // 使用 GSAP 依序播放 8 張序列圖 (原本在這裡算 scale，現在移到上面了)
     RIPPLE_KEYFRAMES.forEach(data => {
       const frameId = String(data.id); 
       let texture = rippleTextures[char]?.[frameId];
-      if (!texture) texture = rippleTextures['fallback']?.[frameId]; // 容錯降級機制
+      if (!texture) texture = rippleTextures['fallback']?.[frameId]; 
       if (!texture) return; 
 
       const sprite = new window.PIXI.Sprite(texture);
       sprite.anchor.set(0.5); 
       sprite.alpha = 0; 
-      sprite.scale.set(randomScale); 
+      sprite.scale.set(randomScale); // 🌟 套用剛剛算好的統一大小
       dropContainer.addChild(sprite);
 
       const startTime = data.start / FPS;
