@@ -20,6 +20,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
 
   // 紋理字典，結構為 { fallback: { "1": Texture, ... }, "孤單": { "1": Texture, ... } }
   const rippleTextures = { fallback: {} };
+  let rippleHistory = [];
 
   // ==========================================
   // 1. 載入通用的「預設水波紋」(Fallback Textures)
@@ -135,6 +136,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     timer = 0;
     isMonitorDone = false;
     activeRipplesList = []; 
+    rippleHistory = [];
   };
 
   /**
@@ -180,6 +182,10 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     // ==========================================
     // 1. 先計算出這次水波紋的最終大小
     const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
+
+    // 🌟 新增：將落點座標與當下算好的縮放比例打包存進歷史陣列
+    rippleHistory.push({ x, y, scale: randomScale });
+    console.log(`🧠 [記憶系統] 已記錄落點: (${x}, ${y})，累計總數: ${rippleHistory.length}`);
 
     // 2. 利用常數將浮動範圍 (RIPPLE_RANDOM_SCALE) 切成三等分，求出兩個臨界值
     const tierSize = RIPPLE_RANDOM_SCALE / 3;
