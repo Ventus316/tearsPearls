@@ -105,4 +105,4 @@ export const STANDBY_WIND_DURATION = "10s";          // 一次呼吸循環的時
 // 🔌 網路通訊設定 (Network & Socket Settings)
 // 佈展提醒：請確認此 IP 與啟動 server.js 的主機區域網路 IPv4 一致
 // ==========================================
-export const SERVER_IP = 'http://192.168.138.1:3000';
+export const SERVER_IP = 'http://10.110.153.97:3000';

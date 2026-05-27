@@ -105,8 +105,8 @@ export function setupTablet(app, onSettlement, onPlaySound) {
 
     gemSpriteBottom.textures = frames; 
     gemSpriteTop.textures = frames;
-    gemSpriteBottom.anchor.set(GEM_INITIAL_SCALE); 
-    gemSpriteTop.anchor.set(GEM_INITIAL_SCALE);
+    gemSpriteBottom.anchor.set(0.5); 
+    gemSpriteTop.anchor.set(0.5);
 
     // ==========================================
     // 🌟 寶石旋轉速度控制核心
