@@ -184,8 +184,8 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
 
     // 🌟 新增：將落點座標與當下算好的縮放比例打包存進歷史陣列
-    rippleHistory.push({ x, y, scale: randomScale });
-    console.log(`🧠 [記憶系統] 已記錄落點: (${x}, ${y})，累計總數: ${rippleHistory.length}`);
+    rippleHistory.push({ x, y, scale: randomScale, word: char });
+    console.log(`🧠 [記憶系統] 已記錄落點: (${x}, ${y})，字詞: ${char}，累計: ${rippleHistory.length}`);
 
     // 2. 利用常數將浮動範圍 (RIPPLE_RANDOM_SCALE) 切成三等分，求出兩個臨界值
     const tierSize = RIPPLE_RANDOM_SCALE / 3;
@@ -240,6 +240,123 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     });
   };
 
+// ==========================================================================
+  // 🌟 新增：時空回溯 ── 文字坍縮與記憶粒子螺旋吸入核心 (步驟 3 & 4)
+  // ==========================================================================
+  const runTimeRewindAnimation = () => {
+    const centerX = app.screen.width / 2;
+    const centerY = app.screen.height / 2;
+
+    if (rippleHistory.length === 0) {
+      phase = 'FADE_IN';
+      timer = 0;
+      return;
+    }
+
+    let completedParticles = 0;
+    const totalParticles = rippleHistory.length;
+    const maxRippleDur = 74 / FPS; 
+
+    // ========================================================================
+    // ⏱️ 視覺節奏微調面板 (Adjustable Timing Variables)
+    // ========================================================================
+    const STAGGER_GAP = 0.02;        // 1. 【啟動時間差】每個點錯開起飛的秒數 (原 0.3 -> 改 0.12 更緊湊連貫)
+    const TEXT_REWIND_SPEED = 2.5;   // 2. 【文字坍縮速度】數字越大，文字往內收縮的倍速越快 (原 1.0 -> 改 2.5 倍速快轉)
+    const PARTICLE_FLY_DUR = 1.5;    // 3. 【粒子吸入時間】流星飛回圓心所需的秒數 (原 1.5 -> 改 0.8 更有黑洞強烈吸力感)
+    // ========================================================================
+
+    rippleHistory.forEach((hist, index) => {
+      // 套用自訂的錯開時間差
+      const staggerDelay = (totalParticles - 1 - index) * STAGGER_GAP; 
+
+      const dropContainer = new window.PIXI.Container();
+      dropContainer.x = hist.x;
+      dropContainer.y = hist.y;
+      container.addChild(dropContainer);
+
+      const particle = new window.PIXI.Graphics();
+      particle.beginFill(0xFFFFFF, 1.0); 
+      particle.drawCircle(0, 0, 4);
+      particle.beginFill(0x94eaec, 0.4); 
+      particle.drawCircle(0, 0, 13);
+      particle.endFill();
+
+      const blurFilter = new window.PIXI.filters.BlurFilter();
+      blurFilter.blur = 5;
+      particle.filters = [blurFilter];
+
+      particle.x = hist.x;
+      particle.y = hist.y;
+      particle.alpha = 0;
+      container.addChild(particle);
+
+      const dx = hist.x - centerX;
+      const dy = hist.y - centerY;
+      const initialRadius = Math.hypot(dx, dy); 
+      const initialAngle = Math.atan2(dy, dx);   
+      const animationProps = { radius: initialRadius, angleOffset: 0 };
+
+      const tl = gsap.timeline({
+        delay: staggerDelay,
+        onComplete: () => {
+          dropContainer.destroy({ children: true }); 
+          particle.destroy();                        
+          completedParticles++;
+          
+          if (completedParticles === totalParticles) {
+            phase = 'FADE_IN'; 
+            timer = 0;
+          }
+        }
+      });
+
+      // ----------------------------------------------------
+      // 🎬 階段 A：文字圖片逆向坍縮倒放 (套用 TEXT_REWIND_SPEED)
+      // ----------------------------------------------------
+      RIPPLE_KEYFRAMES.forEach(data => {
+        const frameId = String(data.id);
+        let texture = rippleTextures[hist.word]?.[frameId] || rippleTextures['fallback']?.[frameId];
+        if (!texture) return;
+
+        const sprite = new window.PIXI.Sprite(texture);
+        sprite.anchor.set(0.5);
+        sprite.alpha = 0;
+        sprite.scale.set(hist.scale); 
+        dropContainer.addChild(sprite);
+
+        // 🧮 數學反轉並加速：除以 TEXT_REWIND_SPEED 達到快轉效果
+        const revStart = (maxRippleDur - (data.end / FPS)) / TEXT_REWIND_SPEED;
+        const revPeak = (maxRippleDur - (data.peak / FPS)) / TEXT_REWIND_SPEED;
+        const revEnd = (maxRippleDur - (data.start / FPS)) / TEXT_REWIND_SPEED;
+        
+        const fadeInDur = revPeak - revStart;
+        const fadeOutDur = revEnd - revPeak;
+
+        tl.to(sprite, { alpha: 1, duration: fadeInDur, ease: "none" }, revStart)
+          .to(sprite, { alpha: 0, duration: fadeOutDur, ease: "none" }, revPeak);
+      });
+
+      // ----------------------------------------------------
+      // 🎬 階段 B：光點螺旋吸入 (套用 PARTICLE_FLY_DUR)
+      // ----------------------------------------------------
+      const particleStart = (maxRippleDur - (7 / FPS)) / TEXT_REWIND_SPEED; 
+
+      tl.to(particle, { alpha: 1, duration: 0.2, ease: "none" }, particleStart)
+        .to(animationProps, {
+          radius: 0,
+          angleOffset: 2.2, 
+          duration: PARTICLE_FLY_DUR,  // 套用自訂吸入時間
+          ease: "power2.in", 
+          onUpdate: () => {
+            const currentAngle = initialAngle + animationProps.angleOffset;
+            particle.x = centerX + Math.cos(currentAngle) * animationProps.radius;
+            particle.y = centerY + Math.sin(currentAngle) * animationProps.radius;
+          }
+        }, particleStart)
+        .to(particle, { scaleX: 0.1, scaleY: 0.1, duration: PARTICLE_FLY_DUR, ease: "power2.in" }, particleStart);
+    });
+  };
+
   return { 
     addRipple, 
     revealGem, 
@@ -279,9 +396,18 @@ export function setupTablet(app, onSettlement, onPlaySound) {
       if (phase !== 'IDLE') {
         timer += delta * 16.66; 
         
-        if (phase === 'DELAY') {
-          if (timer >= 5000) { phase = 'FADE_IN'; timer = 0; }
+      if (phase === 'DELAY') {
+          // 🌟 核心串接：當大螢幕瀑布播完 (isMonitorDone) 且場上所有觸控文字水波都消失了
+          if (isMonitorDone && activeRipplesList.length === 0) { 
+            phase = 'PHASE_REWIND'; // 進入回溯漩渦階段
+            timer = 0;
+            runTimeRewindAnimation(); // 🚀 啟動倒敘大集結流星雨！
+          }
         } 
+        else if (phase === 'PHASE_REWIND') {
+          // 💡 靜靜等待 runTimeRewindAnimation 裡面的流星全數撞擊圓心
+          // 撞完之後，粒子動畫會自動把狀態機改為 'FADE_IN'，無縫接軌！
+        }
         else if (phase === 'FADE_IN') {
           let progress = Math.min(timer / 10000, 1.0); 
           let easeP = progress * progress; 
