@@ -6,6 +6,9 @@ import {
   GEM_INITIAL_SCALE, 
   GEM_FINAL_SCALE, 
   GEM_HITBOX_RADIUS,
+  GEM_MASK_WIDTH, 
+  GEM_MASK_HEIGHT,
+  GEM_BOTTOM_ALPHA,
   RIPPLE_BASE_SCALE,
   RIPPLE_RANDOM_SCALE,
   REWIND_STAGGER_GAP,
@@ -75,6 +78,10 @@ export function setupTablet(app, onSettlement, onPlaySound) {
   let gemSpriteBottom = new window.PIXI.AnimatedSprite([window.PIXI.Texture.EMPTY]);
   let gemSpriteTop = new window.PIXI.AnimatedSprite([window.PIXI.Texture.EMPTY]);
 
+  // 🌟 新增：寶石動態矩形遮罩 (實作由下往上顯影)
+  const gemMask = new window.PIXI.Graphics();
+  container.addChild(gemMask); // 加入畫布中才能生效
+
   const initGemSprite = (sprite, parent) => {
     sprite.anchor.set(0.5); 
     sprite.x = app.screen.width / 2; 
@@ -86,6 +93,9 @@ export function setupTablet(app, onSettlement, onPlaySound) {
 
   initGemSprite(gemSpriteBottom, waterLayer); 
   initGemSprite(gemSpriteTop, container);     
+
+  // 🌟 新增：將遮罩綁定給頂層寶石
+  gemSpriteTop.mask = gemMask;
 
   const splashContainer = new window.PIXI.Container();
   container.addChild(splashContainer);
@@ -134,11 +144,17 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     gemSpriteBottom.play(); 
     gemSpriteTop.play();
     
+    // 初始隱形，靜待時空回溯大集結
     gemSpriteBottom.alpha = 0; 
     gemSpriteTop.alpha = 0;
-    gemSpriteBottom.scale.set(0.04); 
-    gemSpriteTop.scale.set(0.04);
     
+    // 🌟 修改：直接設定為最終完美大小，不需要再慢慢放大了！
+    gemSpriteBottom.scale.set(GEM_FINAL_SCALE); 
+    gemSpriteTop.scale.set(GEM_FINAL_SCALE);
+    
+    // 🌟 新增：重置遮罩 (清空矩形，讓寶石完全被隱藏)
+    gemMask.clear();
+
     phase = 'DELAY';
     timer = 0;
     isMonitorDone = false;
@@ -400,19 +416,27 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           // 等待粒子動畫完成，由 GSAP 的 setTimeout 切換至 FADE_IN
         }
         else if (phase === 'FADE_IN') {
-          // 🌟 套用常數：寶石顯影時間
           let progress = Math.min(timer / GEM_REVEAL_DURATION, 1.0); 
-          let easeP = progress * progress; 
-          let currentScale = GEM_INITIAL_SCALE + (easeP * (GEM_FINAL_SCALE - GEM_INITIAL_SCALE));
           
-          // 根據顯影總時間，自動計算交疊淡入 (Crossfade) 的時機 (取後半段時間)
-          const halfReveal = GEM_REVEAL_DURATION / 2;
-          let crossfadeP = timer > halfReveal ? Math.min((timer - halfReveal) / halfReveal, 1.0) : 0;
+          // 🌟 套用常數：遮罩寬高
+          const maskW = GEM_MASK_WIDTH;
+          const maskH = GEM_MASK_HEIGHT;
           
-          gemSpriteBottom.scale.set(currentScale); 
-          gemSpriteTop.scale.set(currentScale);
-          gemSpriteBottom.alpha = easeP * (1.0 - crossfadeP); 
-          gemSpriteTop.alpha = easeP * crossfadeP;            
+          const revealHeight = maskH * progress; 
+
+          gemMask.clear();
+          gemMask.beginFill(0xffffff);
+          gemMask.drawRect(
+            centerX - maskW / 2, 
+            centerY + maskH / 2 - revealHeight, 
+            maskW, 
+            revealHeight
+          );
+          gemMask.endFill();
+
+          // 🌟 套用常數：底層全息氛圍亮度
+          gemSpriteBottom.alpha = progress * GEM_BOTTOM_ALPHA; 
+          gemSpriteTop.alpha = Math.min(progress * 2, 1.0);            
           
           if (progress >= 1.0) phase = 'WAIT_MONITOR'; 
         }
