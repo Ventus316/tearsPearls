@@ -102,7 +102,25 @@ export const STANDBY_WIND_SCALE_VALUES = "5; 60; 5"; // 波動強度變化 (最�
 export const STANDBY_WIND_DURATION = "10s";          // 一次呼吸循環的時間
 
 // ==========================================
-// 🔌 網路通訊設定 (Network & Socket Settings)
-// 佈展提醒：請確認此 IP 與啟動 server.js 的主機區域網路 IPv4 一致
+// ⏳ 動畫與時空回溯節奏控制 (Animation & Timing Settings)
 // ==========================================
-export const SERVER_IP = 'http://10.110.153.97:3000';
+
+// 1. 【時空回溯階段】
+export const REWIND_STAGGER_GAP = 0.02;      // 啟動時間差：每個點錯開起飛的秒數
+export const REWIND_TEXT_SPEED = 2.5;        // 文字坍縮速度：數字越大，文字收縮越快
+export const REWIND_PARTICLE_DUR = 1.5;      // 粒子吸入時間：流星飛回圓心所需的秒數
+
+// 2. 【寶石顯影與結算階段】
+export const DELAY_BEFORE_GEM_REVEAL = 250;
+// 呼吸間隔：粒子全數吸入後，等待寶石開始顯影的時間 (毫秒)
+export const GEM_REVEAL_DURATION = 3000;    
+// 顯影時間：寶石從無到完全顯影放大的總時間 (毫秒)
+export const DELAY_BEFORE_SETTLEMENT = 5000; 
+// 結算停留：寶石顯影完畢後，停留多久才進入結算 (毫秒)
+export const GEM_FADE_OUT_DURATION = 1000;   
+// 淡出時間：寶石與畫面變暗的過渡時間 (毫秒)
+
+// ==========================================
+// 🔌 網路通訊設定 (Network & Socket Settings)
+// ==========================================
+export const SERVER_IP = 'http://192.168.0.105:3000';

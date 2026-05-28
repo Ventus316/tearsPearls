@@ -7,7 +7,14 @@ import {
   GEM_FINAL_SCALE, 
   GEM_HITBOX_RADIUS,
   RIPPLE_BASE_SCALE,
-  RIPPLE_RANDOM_SCALE
+  RIPPLE_RANDOM_SCALE,
+  REWIND_STAGGER_GAP,
+  REWIND_TEXT_SPEED,
+  REWIND_PARTICLE_DUR,
+  DELAY_BEFORE_GEM_REVEAL,
+  GEM_REVEAL_DURATION,
+  DELAY_BEFORE_SETTLEMENT,
+  GEM_FADE_OUT_DURATION
 } from '../config/constants';
 
 /**
@@ -257,17 +264,9 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     const totalParticles = rippleHistory.length;
     const maxRippleDur = 74 / FPS; 
 
-    // ========================================================================
-    // ⏱️ 視覺節奏微調面板 (Adjustable Timing Variables)
-    // ========================================================================
-    const STAGGER_GAP = 0.02;        // 1. 【啟動時間差】每個點錯開起飛的秒數 (原 0.3 -> 改 0.12 更緊湊連貫)
-    const TEXT_REWIND_SPEED = 2.5;   // 2. 【文字坍縮速度】數字越大，文字往內收縮的倍速越快 (原 1.0 -> 改 2.5 倍速快轉)
-    const PARTICLE_FLY_DUR = 1.5;    // 3. 【粒子吸入時間】流星飛回圓心所需的秒數 (原 1.5 -> 改 0.8 更有黑洞強烈吸力感)
-    // ========================================================================
-
     rippleHistory.forEach((hist, index) => {
-      // 套用自訂的錯開時間差
-      const staggerDelay = (totalParticles - 1 - index) * STAGGER_GAP; 
+      // 🌟 套用常數：錯開時間差
+      const staggerDelay = (totalParticles - 1 - index) * REWIND_STAGGER_GAP; 
 
       const dropContainer = new window.PIXI.Container();
       dropContainer.x = hist.x;
@@ -304,15 +303,16 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           completedParticles++;
           
           if (completedParticles === totalParticles) {
-            phase = 'FADE_IN'; 
-            timer = 0;
+            // 🌟 套用常數：粒子吸完後的呼吸間隔
+            setTimeout(() => {
+              phase = 'FADE_IN'; 
+              timer = 0;
+            }, DELAY_BEFORE_GEM_REVEAL); 
           }
         }
       });
 
-      // ----------------------------------------------------
-      // 🎬 階段 A：文字圖片逆向坍縮倒放 (套用 TEXT_REWIND_SPEED)
-      // ----------------------------------------------------
+      // 🎬 階段 A：文字圖片逆向坍縮倒放
       RIPPLE_KEYFRAMES.forEach(data => {
         const frameId = String(data.id);
         let texture = rippleTextures[hist.word]?.[frameId] || rippleTextures['fallback']?.[frameId];
@@ -324,10 +324,10 @@ export function setupTablet(app, onSettlement, onPlaySound) {
         sprite.scale.set(hist.scale); 
         dropContainer.addChild(sprite);
 
-        // 🧮 數學反轉並加速：除以 TEXT_REWIND_SPEED 達到快轉效果
-        const revStart = (maxRippleDur - (data.end / FPS)) / TEXT_REWIND_SPEED;
-        const revPeak = (maxRippleDur - (data.peak / FPS)) / TEXT_REWIND_SPEED;
-        const revEnd = (maxRippleDur - (data.start / FPS)) / TEXT_REWIND_SPEED;
+        // 🌟 套用常數：文字坍縮速度
+        const revStart = (maxRippleDur - (data.end / FPS)) / REWIND_TEXT_SPEED;
+        const revPeak = (maxRippleDur - (data.peak / FPS)) / REWIND_TEXT_SPEED;
+        const revEnd = (maxRippleDur - (data.start / FPS)) / REWIND_TEXT_SPEED;
         
         const fadeInDur = revPeak - revStart;
         const fadeOutDur = revEnd - revPeak;
@@ -336,16 +336,15 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           .to(sprite, { alpha: 0, duration: fadeOutDur, ease: "none" }, revPeak);
       });
 
-      // ----------------------------------------------------
-      // 🎬 階段 B：光點螺旋吸入 (套用 PARTICLE_FLY_DUR)
-      // ----------------------------------------------------
-      const particleStart = (maxRippleDur - (7 / FPS)) / TEXT_REWIND_SPEED; 
+      // 🎬 階段 B：光點螺旋吸入
+      const particleStart = (maxRippleDur - (7 / FPS)) / REWIND_TEXT_SPEED; 
 
       tl.to(particle, { alpha: 1, duration: 0.2, ease: "none" }, particleStart)
         .to(animationProps, {
           radius: 0,
           angleOffset: 2.2, 
-          duration: PARTICLE_FLY_DUR,  // 套用自訂吸入時間
+          // 🌟 套用常數：粒子吸入時間
+          duration: REWIND_PARTICLE_DUR,  
           ease: "power2.in", 
           onUpdate: () => {
             const currentAngle = initialAngle + animationProps.angleOffset;
@@ -353,7 +352,8 @@ export function setupTablet(app, onSettlement, onPlaySound) {
             particle.y = centerY + Math.sin(currentAngle) * animationProps.radius;
           }
         }, particleStart)
-        .to(particle, { scaleX: 0.1, scaleY: 0.1, duration: PARTICLE_FLY_DUR, ease: "power2.in" }, particleStart);
+        // 🌟 套用常數：粒子吸入時間
+        .to(particle, { scaleX: 0.1, scaleY: 0.1, duration: REWIND_PARTICLE_DUR, ease: "power2.in" }, particleStart);
     });
   };
 
@@ -362,13 +362,11 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     revealGem, 
     monitorFinished,
     updateWater: (delta, time) => {
-      // 確保寶石永遠置中
       const centerX = app.screen.width / 2;
       const centerY = app.screen.height / 2;
       gemSpriteBottom.position.set(centerX, centerY);
       gemSpriteTop.position.set(centerX, centerY);
 
-      // 更新飛濺水花的重力與透明度
       for (let i = activeSplashes.length - 1; i >= 0; i--) {
         let p = activeSplashes[i];
         p.vy += 0.4 * delta; 
@@ -383,36 +381,33 @@ export function setupTablet(app, onSettlement, onPlaySound) {
         }
       }
 
-      // 更新水波紋的存活計時器
       for (let i = activeRipplesList.length - 1; i >= 0; i--) {
         activeRipplesList[i].timer -= delta * 16.66;
         if (activeRipplesList[i].timer <= 0) activeRipplesList.splice(i, 1);
       }
 
-      // ==========================================
-      // 動畫狀態機 (Animation State Machine)
-      // 控制寶石從顯影、變大、等待水面平靜、到最終淡出的完整生命週期
-      // ==========================================
       if (phase !== 'IDLE') {
         timer += delta * 16.66; 
         
       if (phase === 'DELAY') {
-          // 🌟 核心串接：當大螢幕瀑布播完 (isMonitorDone) 且場上所有觸控文字水波都消失了
           if (isMonitorDone && activeRipplesList.length === 0) { 
-            phase = 'PHASE_REWIND'; // 進入回溯漩渦階段
+            phase = 'PHASE_REWIND'; 
             timer = 0;
-            runTimeRewindAnimation(); // 🚀 啟動倒敘大集結流星雨！
+            runTimeRewindAnimation(); 
           }
         } 
         else if (phase === 'PHASE_REWIND') {
-          // 💡 靜靜等待 runTimeRewindAnimation 裡面的流星全數撞擊圓心
-          // 撞完之後，粒子動畫會自動把狀態機改為 'FADE_IN'，無縫接軌！
+          // 等待粒子動畫完成，由 GSAP 的 setTimeout 切換至 FADE_IN
         }
         else if (phase === 'FADE_IN') {
-          let progress = Math.min(timer / 10000, 1.0); 
+          // 🌟 套用常數：寶石顯影時間
+          let progress = Math.min(timer / GEM_REVEAL_DURATION, 1.0); 
           let easeP = progress * progress; 
           let currentScale = GEM_INITIAL_SCALE + (easeP * (GEM_FINAL_SCALE - GEM_INITIAL_SCALE));
-          let crossfadeP = timer > 5000 ? Math.min((timer - 5000) / 5000.0, 1.0) : 0;
+          
+          // 根據顯影總時間，自動計算交疊淡入 (Crossfade) 的時機 (取後半段時間)
+          const halfReveal = GEM_REVEAL_DURATION / 2;
+          let crossfadeP = timer > halfReveal ? Math.min((timer - halfReveal) / halfReveal, 1.0) : 0;
           
           gemSpriteBottom.scale.set(currentScale); 
           gemSpriteTop.scale.set(currentScale);
@@ -425,24 +420,24 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           if (isMonitorDone) phase = 'WAIT_RIPPLES'; 
         }
         else if (phase === 'WAIT_RIPPLES') {
-          // 確保畫面淨空：所有水波紋與水花皆已消散
           if (activeSplashes.length === 0 && activeRipplesList.length === 0) {
             phase = 'SETTLEMENT_DELAY';
             timer = 0;
           }
         }
         else if (phase === 'SETTLEMENT_DELAY') {
-          // 防呆機制：若倒數期間因網路延遲又產生水波，則退回上一步等待
           if (activeSplashes.length > 0 || activeRipplesList.length > 0) {
             phase = 'WAIT_RIPPLES';
           } 
-          else if (timer >= 1500) { 
+          // 🌟 套用常數：結算畫面停留間隔
+          else if (timer >= DELAY_BEFORE_SETTLEMENT) { 
             phase = 'FADE_OUT'; 
             timer = 0; 
           }
         }
         else if (phase === 'FADE_OUT') {
-          let fadeP = Math.min(timer / 1500.0, 1.0); 
+          // 🌟 套用常數：寶石淡出時間
+          let fadeP = Math.min(timer / GEM_FADE_OUT_DURATION, 1.0); 
           gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); 
           gemSpriteBottom.alpha = 0; 
           
@@ -450,7 +445,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
             phase = 'IDLE'; 
             gemSpriteBottom.stop(); 
             gemSpriteTop.stop(); 
-            if (onSettlement) onSettlement(); // 觸發 React 切換結算 UI
+            if (onSettlement) onSettlement(); 
           }
         }
       }
