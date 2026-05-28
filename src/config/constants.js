@@ -86,7 +86,6 @@ export const GEM_ROTATION_SPEEDS = {
 // ==========================================
 export const GEM_INITIAL_SCALE = 0.04;    // 寶石剛出場時的極小初始尺寸 (Scale)
 export const GEM_FINAL_SCALE = 0.24;      // 寶石動畫結束後的最終尺寸 (原本為 0.04 + 0.2)
-export const GEM_HITBOX_RADIUS = 30;      // 寶石判定水花噴發的碰撞半徑 (像素)
 
 export const GEM_MASK_WIDTH = 600;        // 寶石顯影遮罩的寬度 (需大於寶石最大尺寸)
 export const GEM_MASK_HEIGHT = 600;       // 寶石顯影遮罩的高度

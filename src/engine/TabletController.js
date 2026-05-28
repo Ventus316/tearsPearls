@@ -5,7 +5,6 @@ import {
   GEM_ROTATION_SPEEDS, 
   GEM_INITIAL_SCALE, 
   GEM_FINAL_SCALE, 
-  GEM_HITBOX_RADIUS,
   GEM_MASK_WIDTH, 
   GEM_MASK_HEIGHT,
   GEM_BOTTOM_ALPHA,
@@ -97,10 +96,6 @@ export function setupTablet(app, onSettlement, onPlaySound) {
   // 🌟 新增：將遮罩綁定給頂層寶石
   gemSpriteTop.mask = gemMask;
 
-  const splashContainer = new window.PIXI.Container();
-  container.addChild(splashContainer);
-  
-  let activeSplashes = []; 
   let activeRipplesList = []; 
   const sheetCache = {};
 
@@ -162,16 +157,6 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     rippleHistory = [];
   };
 
-  /**
-   * 檢查掉落物是否擊中顯影中的寶石範圍
-   */
-  const isHittingGem = (x, y) => {
-    if (phase === 'IDLE' || phase === 'DELAY' || phase === 'FADE_OUT') return false;
-    if (phase === 'FADE_IN' && timer < 3000) return false; 
-    let dist = Math.hypot(x - (app.screen.width / 2), y - (app.screen.height / 2));
-    return dist < GEM_HITBOX_RADIUS; 
-  };
-
   const FPS = 30; 
   // 水波紋 8 幀關鍵影格時間軸 (start, peak, end)
   const RIPPLE_KEYFRAMES = [
@@ -185,21 +170,6 @@ export function setupTablet(app, onSettlement, onPlaySound) {
    * 在指定座標生成水波紋或水花碰撞特效
    */
   const addRipple = (x, y, char) => {
-    // 若擊中寶石，則改為生成飛濺水花粒子
-    if (isHittingGem(x, y)) {
-      const numSplashes = Math.floor(Math.random() * 4) + 5; 
-      for (let i = 0; i < numSplashes; i++) {
-        const dot = new window.PIXI.Graphics();
-        dot.beginFill(0xFFFFFF, 0.7 + Math.random() * 0.3); 
-        dot.drawCircle(0, 0, Math.random() * 1.5 + 1.0); 
-        dot.endFill();
-        dot.x = x; dot.y = y;
-        splashContainer.addChild(dot);
-        activeSplashes.push({ sprite: dot, vx: (Math.random() - 0.5) * 8, vy: -(Math.random() * 5 + 3), life: 1.0 });
-      }
-      return; 
-    }
-    
     // ==========================================
     // 🌟 動態判斷水波大小與發送對應音效
     // ==========================================
@@ -383,20 +353,6 @@ export function setupTablet(app, onSettlement, onPlaySound) {
       gemSpriteBottom.position.set(centerX, centerY);
       gemSpriteTop.position.set(centerX, centerY);
 
-      for (let i = activeSplashes.length - 1; i >= 0; i--) {
-        let p = activeSplashes[i];
-        p.vy += 0.4 * delta; 
-        p.sprite.x += p.vx * delta; 
-        p.sprite.y += p.vy * delta; 
-        p.life -= (delta * 16.66) / 500.0; 
-        p.sprite.alpha = Math.max(0, p.life); 
-        if (p.life <= 0) { 
-          splashContainer.removeChild(p.sprite); 
-          p.sprite.destroy(); 
-          activeSplashes.splice(i, 1); 
-        }
-      }
-
       for (let i = activeRipplesList.length - 1; i >= 0; i--) {
         activeRipplesList[i].timer -= delta * 16.66;
         if (activeRipplesList[i].timer <= 0) activeRipplesList.splice(i, 1);
@@ -444,13 +400,13 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           if (isMonitorDone) phase = 'WAIT_RIPPLES'; 
         }
         else if (phase === 'WAIT_RIPPLES') {
-          if (activeSplashes.length === 0 && activeRipplesList.length === 0) {
+          if (activeRipplesList.length === 0) {
             phase = 'SETTLEMENT_DELAY';
             timer = 0;
           }
         }
         else if (phase === 'SETTLEMENT_DELAY') {
-          if (activeSplashes.length > 0 || activeRipplesList.length > 0) {
+          if (activeRipplesList.length > 0) {
             phase = 'WAIT_RIPPLES';
           } 
           // 🌟 套用常數：結算畫面停留間隔
