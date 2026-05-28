@@ -347,7 +347,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     addRipple, 
     revealGem, 
     monitorFinished,
-    updateWater: (delta, time) => {
+    updateWater: (delta) => {
       const centerX = app.screen.width / 2;
       const centerY = app.screen.height / 2;
       gemSpriteBottom.position.set(centerX, centerY);
@@ -358,10 +358,11 @@ export function setupTablet(app, onSettlement, onPlaySound) {
         if (activeRipplesList[i].timer <= 0) activeRipplesList.splice(i, 1);
       }
 
+      // 🌟 將所有活動狀態全部包在 IDLE 以外的邏輯中
       if (phase !== 'IDLE') {
         timer += delta * 16.66; 
         
-      if (phase === 'DELAY') {
+        if (phase === 'DELAY') {
           if (isMonitorDone && activeRipplesList.length === 0) { 
             phase = 'PHASE_REWIND'; 
             timer = 0;
@@ -374,10 +375,8 @@ export function setupTablet(app, onSettlement, onPlaySound) {
         else if (phase === 'FADE_IN') {
           let progress = Math.min(timer / GEM_REVEAL_DURATION, 1.0); 
           
-          // 🌟 套用常數：遮罩寬高
           const maskW = GEM_MASK_WIDTH;
           const maskH = GEM_MASK_HEIGHT;
-          
           const revealHeight = maskH * progress; 
 
           gemMask.clear();
@@ -390,33 +389,23 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           );
           gemMask.endFill();
 
-          // 🌟 套用常數：底層全息氛圍亮度
           gemSpriteBottom.alpha = progress * GEM_BOTTOM_ALPHA; 
           gemSpriteTop.alpha = Math.min(progress * 2, 1.0);            
           
-          if (progress >= 1.0) phase = 'WAIT_MONITOR'; 
-        }
-        else if (phase === 'WAIT_MONITOR') {
-          if (isMonitorDone) phase = 'WAIT_RIPPLES'; 
-        }
-        else if (phase === 'WAIT_RIPPLES') {
-          if (activeRipplesList.length === 0) {
-            phase = 'SETTLEMENT_DELAY';
+          if (progress >= 1.0) {
+            phase = 'SETTLEMENT_DELAY'; 
             timer = 0;
           }
-        }
+        } 
+        // 🌟 修復 1：補回 SETTLEMENT_DELAY 狀態判斷
         else if (phase === 'SETTLEMENT_DELAY') {
-          if (activeRipplesList.length > 0) {
-            phase = 'WAIT_RIPPLES';
-          } 
-          // 🌟 套用常數：結算畫面停留間隔
-          else if (timer >= DELAY_BEFORE_SETTLEMENT) { 
+          if (timer >= DELAY_BEFORE_SETTLEMENT) { 
             phase = 'FADE_OUT'; 
             timer = 0; 
           }
         }
+        // 🌟 修復 2：將 FADE_OUT 移回正確的內部層級
         else if (phase === 'FADE_OUT') {
-          // 🌟 套用常數：寶石淡出時間
           let fadeP = Math.min(timer / GEM_FADE_OUT_DURATION, 1.0); 
           gemSpriteTop.alpha = Math.max(1.0 - fadeP, 0); 
           gemSpriteBottom.alpha = 0; 

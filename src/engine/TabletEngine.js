@@ -25,8 +25,7 @@ export function createTabletEngine(containerElement, onSettlement, onPlaySound) 
   const tabletCtrl = setupTablet(app, onSettlement, onPlaySound);
   // 註冊主渲染迴圈
   app.ticker.add((delta) => {
-    const frameCounter = app.ticker.lastTime * 0.06; 
-    tabletCtrl.updateWater(delta, frameCounter * 0.015);
+    tabletCtrl.updateWater(delta);
   });
 
   return {
