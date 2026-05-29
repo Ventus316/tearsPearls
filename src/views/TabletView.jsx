@@ -37,7 +37,6 @@ export default function TabletView() {
 
   /**
    * ⏱️ 60 秒閒置自動休眠機制
-   * 若 60 秒無任何觸控，強制進入待機模式，並同步通知顯示器。
    */
   const startIdleTimer = () => {
     clearTimeout(idleTimerRef.current);
@@ -50,7 +49,6 @@ export default function TabletView() {
 
   /**
    * 👆 全域觸控監聽
-   * 任何觸控都會重置閒置計時器，並向大螢幕發送喚醒同步訊號。
    */
   const handleGlobalInteraction = () => {
     if (interactionState === 'playing') return;
@@ -75,7 +73,6 @@ export default function TabletView() {
         if (socketRef.current) socketRef.current.emit('tablet-settlement');
         startIdleTimer(); 
       },
-        // 🌟 新增第三個參數：透過 Socket 發送音效播放指令
         (soundType) => {
           if (socketRef.current) {
             socketRef.current.emit('tablet-play-sound', soundType);
@@ -84,12 +81,10 @@ export default function TabletView() {
       );
     }
 
-    // 📥 監聽大螢幕發送的眼淚座標與字元
     socketRef.current.on('tablet-receive-tear', (data) => {
       if (engineRef.current) engineRef.current.receiveTear(data.nx, data.z, data.char, data.word);
     });
     
-    // 📥 監聽大螢幕動畫結束訊號
     socketRef.current.on('tablet-show-finished', () => {
       if (engineRef.current) engineRef.current.monitorFinished();
     });
@@ -106,9 +101,6 @@ export default function TabletView() {
     };
   }, []);
 
-  /**
-   * 🔘 切換詞彙選擇狀態
-   */
   const toggleWord = (word) => {
     if (interactionState !== 'ready') return;
     if (selectedWords.includes(word)) {
@@ -118,9 +110,6 @@ export default function TabletView() {
     }
   };
 
-  /**
-   * 💎 根據選擇的詞彙計算對應的寶石類型
-   */
   const determineGemType = (userWords) => {
     if (!userWords || userWords.length === 0) return 'diamond'; 
     
@@ -176,6 +165,13 @@ export default function TabletView() {
     return `【 ${gemName} 】\n\n${description}`;
   };
 
+  // 🌟 新增：動態計算按鈕上的感性文字
+  const getButtonText = () => {
+    if (selectedWords.length === 0) return '傾聽心聲，挑選 5 個無法言說的真實狀態';
+    if (selectedWords.length < 5) return `已拼湊 ${selectedWords.length} 份靈魂碎片...`;
+    return '盡情哭吧';
+  };
+
   const renderWordButton = (word) => {
     const selected = selectedWords.includes(word);
     return (
@@ -198,7 +194,6 @@ export default function TabletView() {
       className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative"
       onPointerDown={handleGlobalInteraction}
     >
-      {/* 待機影片層 */}
       <video
         src={waitVideo}
         autoPlay
@@ -212,34 +207,18 @@ export default function TabletView() {
 
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
-      {/* 互動介面層 */}
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
         <div className={`pointer-events-auto relative flex w-full h-full flex-col overflow-hidden rounded-[64px] border-[6px] md:border-[8px] border-[#a1d7d8]/60 bg-[rgba(146,162,166,0.92)] shadow-[0_0_80px_rgba(0,0,0,0.38)] transition-all duration-1000 ${interactionState === 'playing' || interactionState === 'standby' ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}>
           
           {interactionState === 'ready' && (
             <div className="flex h-full w-full flex-col">
               
-              <div 
-                className="absolute left-1/2 top-0 flex items-end justify-center z-10"
-                style={{ transform: 'translate(-50%, calc(-50% - 190px))' }} 
-              >
-                <div className="flex h-[505px] w-[600px] rounded-[50%] items-end justify-center border-[8px] border-[#e0f8fa] bg-[#fdffff] shadow-[0_0_60px_rgba(214,255,255,0.85)]">
-                  <span 
-                    className="text-[40px] font-normal tracking-[0.05em] text-[#868999]"
-                    style={{ transform: 'translateY(-0px)' }} 
-                  >
-                    {selectedWords.length}/5
-                  </span>
-                </div>
-              </div>
+              {/* ❌ 已經將上方突兀的白色數字半圓形與佔位區塊刪除 */}
 
-              <div className="shrink-0 h-[70px] md:h-[90px]"></div>
-
-              <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16">
+              <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16 mt-8">
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
 
                 <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
-                  {/* 👇 改成 PRECALCULATED_WORD_ROWS 👇 */}
                   {PRECALCULATED_WORD_ROWS.map((row, rowIndex) => (
                     <React.Fragment key={rowIndex}>
                       <div className="grid grid-cols-5 gap-10 mx-10 md:mx-20">
@@ -255,17 +234,18 @@ export default function TabletView() {
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mt-3 md:mt-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
               </div>
 
-              <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-8 md:pt-3 md:pb-12">
+              {/* 🌟 修改：將按鈕寬度改為動態延展，以容納感性文字 */}
+              <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-10 md:pt-4 md:pb-16">
                 <button
                   onClick={handleCrying}
                   disabled={!canCry}
-                  className={`flex h-[50px] md:h-[60px] lg:h-[64px] w-[min(60vw,320px)] items-center justify-center rounded-full border-[3px] px-6 text-[20px] font-semibold tracking-[0.2em] transition-all duration-300 md:text-[24px] ${
+                  className={`flex h-[50px] md:h-[60px] lg:h-[64px] min-w-[320px] w-fit items-center justify-center rounded-full border-[3px] px-10 font-semibold tracking-[0.2em] transition-all duration-500 md:text-[22px] ${
                     canCry
-                      ? 'border-[#d9f7f7] bg-[#585b6e] text-[#94eaec] shadow-[0_0_24px_rgba(148,234,236,0.35)] hover:brightness-110 active:scale-[0.98] cursor-pointer'
-                      : 'cursor-not-allowed border-[#d9f7f7]/60 bg-[#4d5061] text-[#94eaec]/50 opacity-80'
+                      ? 'border-[#d9f7f7] bg-[#585b6e] text-[#94eaec] shadow-[0_0_24px_rgba(148,234,236,0.35)] hover:brightness-110 active:scale-[0.98] cursor-pointer text-[20px]'
+                      : 'cursor-not-allowed border-[#d9f7f7]/40 bg-[#4d5061]/50 text-[#94eaec]/70 opacity-90 text-[16px] md:text-[18px] font-light'
                   }`}
                 >
-                  盡情哭吧
+                  {getButtonText()}
                 </button>
               </div>
               

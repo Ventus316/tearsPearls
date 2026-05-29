@@ -3,7 +3,7 @@
 // ==========================================
 // 🔌 網路通訊設定 (Network & Socket Settings)
 // ==========================================
-export const SERVER_IP = 'http://192.168.0.105:3000';
+export const SERVER_IP = 'http://192.168.0.203:3000';
 
 // ==========================================
 // 📝 基礎字詞庫 (Vocabulary Base)
@@ -80,7 +80,7 @@ export const GEM_MAPPING = {
 // ==========================================
 export const GEM_ROTATION_SPEEDS = {
   pearl: 2.0,    // 珍珠
-  diamond: 2.0,  // 鑽石
+  diamond: 4.0,  // 鑽石
   crystal: 2.0,  // 白水晶
   opal: 2.0,     // 蛋白石
   lapis: 2.0     // 青金石
