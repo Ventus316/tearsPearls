@@ -389,8 +389,8 @@ export function setupTablet(app, onSettlement, onPlaySound) {
           );
           gemMask.endFill();
 
-          gemSpriteBottom.alpha = progress * GEM_BOTTOM_ALPHA; 
-          gemSpriteTop.alpha = Math.min(progress * 2, 1.0);            
+          gemSpriteBottom.alpha = 0; 
+          gemSpriteTop.alpha = Math.min(progress * 2, 1.0);          
           
           if (progress >= 1.0) {
             phase = 'SETTLEMENT_DELAY'; 
