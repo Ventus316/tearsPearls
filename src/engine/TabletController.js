@@ -169,23 +169,51 @@ export function setupTablet(app, onSettlement, onPlaySound) {
   /**
    * 在指定座標生成水波紋或水花碰撞特效
    */
-  const addRipple = (x, y, char) => {
+  const addRipple = (originalX, y, char) => { // 接收來自大螢幕的原始 X，但我們將在內部重新計算
+    
     // ==========================================
-    // 🌟 動態判斷水波大小與發送對應音效
+    // 🌟 1. 智慧隨機 X 軸落點 (最佳候選點演算法 Best-Candidate)
     // ==========================================
-    // 1. 先計算出這次水波紋的最終大小
+    const margin = 120; // 邊界安全距離，避免文字水波紋被螢幕左右兩側切掉
+    const screenW = app.screen.width;
+    let finalX = margin + Math.random() * (screenW - margin * 2);
+
+    // ⚠️ 核心邏輯：只針對「當下正在播放 (activeRipplesList)」的水波紋進行防重疊檢測
+    if (activeRipplesList.length > 0) {
+      let maxMinDist = -1;
+      const CANDIDATE_COUNT = 10; // 隨機抽樣 10 個點位來評分
+      
+      for (let i = 0; i < CANDIDATE_COUNT; i++) {
+        let candidateX = margin + Math.random() * (screenW - margin * 2);
+        let minDist = Infinity;
+        
+        // 算出這個候選點，距離目前畫面上所有水波紋的「最短距離」
+        for (const ripple of activeRipplesList) {
+          const dist = Math.hypot(candidateX - ripple.x, y - ripple.y);
+          if (dist < minDist) minDist = dist;
+        }
+        
+        // 挑出「最短距離」中最大的那一個 (也就是最空曠的黃金地段)
+        if (minDist > maxMinDist) {
+          maxMinDist = minDist;
+          finalX = candidateX;
+        }
+      }
+    }
+
+    // ==========================================
+    // 🌟 2. 動態判斷水波大小與發送對應音效
+    // ==========================================
     const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
 
-    // 🌟 新增：將落點座標與當下算好的縮放比例打包存進歷史陣列
-    rippleHistory.push({ x, y, scale: randomScale, word: char });
-    console.log(`🧠 [記憶系統] 已記錄落點: (${x}, ${y})，字詞: ${char}，累計: ${rippleHistory.length}`);
+    // 🌟 寫入歷史記憶 (使用計算出的 finalX)
+    rippleHistory.push({ x: finalX, y, scale: randomScale, word: char });
+    console.log(`🧠 [記憶系統] 已記錄落點: (${finalX.toFixed(1)}, ${y.toFixed(1)})，字詞: ${char}，累計: ${rippleHistory.length}`);
 
-    // 2. 利用常數將浮動範圍 (RIPPLE_RANDOM_SCALE) 切成三等分，求出兩個臨界值
     const tierSize = RIPPLE_RANDOM_SCALE / 3;
-    const thresholdSmall = RIPPLE_BASE_SCALE + tierSize;       // 小與中的界線
-    const thresholdMid = RIPPLE_BASE_SCALE + (tierSize * 2);   // 中與大的界線
+    const thresholdSmall = RIPPLE_BASE_SCALE + tierSize;       
+    const thresholdMid = RIPPLE_BASE_SCALE + (tierSize * 2);   
 
-    // 3. 判斷落點並發送對應音效名稱給大螢幕
     if (onPlaySound) {
       if (randomScale < thresholdSmall) {
         onPlaySound('drop_small');
@@ -196,16 +224,17 @@ export function setupTablet(app, onSettlement, onPlaySound) {
       }
     }
 
-    // 記錄水波存活時間
-    activeRipplesList.push({ timer: 2460 }); 
+    // 🌟 寫入活躍清單 (將 finalX 與 y 一併存入，供下一個水波紋計算空間使用)
+    activeRipplesList.push({ x: finalX, y: y, timer: 2460 }); 
     
     const dropContainer = new window.PIXI.Container();
-    dropContainer.x = x; dropContainer.y = y;
+    dropContainer.x = finalX; // 🌟 實際渲染在計算出的最空曠 X 座標
+    dropContainer.y = y;
     waterLayer.addChild(dropContainer);
 
     let maxDurationSeconds = 0;
 
-    // 使用 GSAP 依序播放 8 張序列圖 (原本在這裡算 scale，現在移到上面了)
+    // 使用 GSAP 依序播放 8 張序列圖
     RIPPLE_KEYFRAMES.forEach(data => {
       const frameId = String(data.id); 
       let texture = rippleTextures[char]?.[frameId];
@@ -215,7 +244,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
       const sprite = new window.PIXI.Sprite(texture);
       sprite.anchor.set(0.5); 
       sprite.alpha = 0; 
-      sprite.scale.set(randomScale); // 🌟 套用剛剛算好的統一大小
+      sprite.scale.set(randomScale); 
       dropContainer.addChild(sprite);
 
       const startTime = data.start / FPS;

@@ -105,9 +105,9 @@ export const RIPPLE_RANDOM_SCALE = 0.15;   // 水波紋文字的隨機放大變�
 // ==========================================
 // 🌬️ 顯示器待機畫面呼吸特效 (Monitor Standby Displacement Settings)
 // ==========================================
-export const STANDBY_WIND_FREQUENCY = "0.003 0.005"; // 波動頻率 (數值越小，波浪越寬廣柔軟)
-export const STANDBY_WIND_SCALE_VALUES = "5; 60; 5"; // 波動強度變化 (最小值; 最大值; 最小值)
-export const STANDBY_WIND_DURATION = "10s";          // 一次呼吸循環的時間
+export const STANDBY_WIND_FREQUENCY = "0.005 0.008"; // 波動頻率 (數值越小，波浪越寬廣柔軟)
+export const STANDBY_WIND_SCALE_VALUES = "5; 150; 5"; // 波動強度變化 (最小值; 最大值; 最小值)
+export const STANDBY_WIND_DURATION = "20s";          // 一次呼吸循環的時間
 
 // ==========================================
 // ⏳ 動畫與時空回溯節奏控制 (Animation & Timing Settings)
