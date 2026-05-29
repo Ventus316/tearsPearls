@@ -43,7 +43,7 @@ export const SETTLEMENT_DESCRIPTIONS = {
 // 🔤 字體與視覺設定 (Typography & Visuals)
 // ==========================================
 export const FONT_FAMILY = '"PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif'; 
-export const FONT_SIZE_BASE = 8;        
+export const FONT_SIZE_BASE = 20;
 
 // 📝 文字顏色設定 (可隨時修改十六進位值)
 export const TEXT_FILL_COLOR = 0xADD8E6;    // 淺藍色文字 (Light Blue)
@@ -121,9 +121,9 @@ export const REWIND_PARTICLE_DUR = 1.5;      // 粒子吸入時間：流星飛�
 // 2. 【寶石顯影與結算階段】
 export const DELAY_BEFORE_GEM_REVEAL = 250;
 // 呼吸間隔：粒子全數吸入後，等待寶石開始顯影的時間 (毫秒)
-export const GEM_REVEAL_DURATION = 3000;    
+export const GEM_REVEAL_DURATION = 2500;    
 // 顯影時間：寶石從無到完全顯影放大的總時間 (毫秒)
-export const DELAY_BEFORE_SETTLEMENT = 5000; 
+export const DELAY_BEFORE_SETTLEMENT = 2500; 
 // 結算停留：寶石顯影完畢後，停留多久才進入結算 (毫秒)
 export const GEM_FADE_OUT_DURATION = 1000;   
 // 淡出時間：寶石與畫面變暗的過渡時間 (毫秒)

@@ -178,7 +178,7 @@ export default function TabletView() {
       <button
         key={word}
         onClick={() => toggleWord(word)}
-        className={`flex w-full h-[40px] md:h-[48px] lg:h-[52px] items-center justify-center rounded-full border-[2px] md:border-[3px] text-[13px] md:text-[15px] lg:text-[16px] font-medium tracking-[0.18em] transition-all duration-200 ${
+        className={`flex w-full h-[40px] md:h-[48px] lg:h-[52px] items-center justify-center rounded-full border-[2px] md:border-[3px] text-[18px] font-medium tracking-[0.18em] transition-all duration-200 ${
           selected
             ? 'border-[#e6ffff] bg-[#b8d8f0] text-[#173133] shadow-[0_0_15px_rgba(255,255,255,0.7)] scale-[1.03]'
             : 'border-[#b8e8ea] bg-[#a8cfea] text-[#173133] shadow-[0_0_8px_rgba(255,255,255,0.3)] hover:-translate-y-1 hover:brightness-105'
@@ -215,7 +215,7 @@ export default function TabletView() {
               
               {/* ❌ 已經將上方突兀的白色數字半圓形與佔位區塊刪除 */}
 
-              <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16 mt-8">
+              <div className="flex flex-1 flex-col w-full items-center justify-center px-4 md:px-12 lg:px-16 mt-20 ">
                 <div className="w-full max-w-[800px] h-[3px] bg-[#e0f8fa]/40 rounded-full mb-3 md:mb-5 shadow-[0_0_8px_rgba(224,248,250,0.3)]"></div>
 
                 <div className="flex flex-col w-full max-w-[800px] gap-y-2 md:gap-y-3 my-1">
@@ -235,7 +235,7 @@ export default function TabletView() {
               </div>
 
               {/* 🌟 修改：將按鈕寬度改為動態延展，以容納感性文字 */}
-              <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-10 md:pt-4 md:pb-16">
+              <div className="shrink-0 flex w-full items-center justify-center pt-2 pb-13">
                 <button
                   onClick={handleCrying}
                   disabled={!canCry}
