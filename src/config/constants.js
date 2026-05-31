@@ -132,10 +132,7 @@ export const GEM_FADE_OUT_DURATION = 1000;
 // 🎵 隨機水滴音效檔案池 (Audio Pool Settings)
 // ==========================================
 export const AUDIO_POOL = [
-  // 'drop1.mp3',
   'drop2.mp3',
   'drop3.mp3',
-  // 'drop4.mp3',
   'drop5.wav'
-  // 💡 你可以隨時在這裡新增或修改檔名，記得包含副檔名 (.mp3 或 .wav)
 ];
