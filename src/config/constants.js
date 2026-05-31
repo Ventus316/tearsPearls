@@ -80,7 +80,7 @@ export const GEM_MAPPING = {
 // ==========================================
 export const GEM_ROTATION_SPEEDS = {
   pearl: 3.0,    // 珍珠
-  diamond: 4.0,  // 鑽石
+  diamond: 9.0,  // 鑽石
   crystal: 3.0,  // 白水晶
   opal: 3.0,     // 蛋白石
   lapis: 3.0     // 青金石
@@ -127,3 +127,15 @@ export const DELAY_BEFORE_SETTLEMENT = 4000;
 // 結算停留：寶石顯影完畢後，停留多久才進入結算 (毫秒)
 export const GEM_FADE_OUT_DURATION = 1000;   
 // 淡出時間：寶石與畫面變暗的過渡時間 (毫秒)
+
+// ==========================================
+// 🎵 隨機水滴音效檔案池 (Audio Pool Settings)
+// ==========================================
+export const AUDIO_POOL = [
+  // 'drop1.mp3',
+  'drop2.mp3',
+  'drop3.mp3',
+  // 'drop4.mp3',
+  'drop5.wav'
+  // 💡 你可以隨時在這裡新增或修改檔名，記得包含副檔名 (.mp3 或 .wav)
+];

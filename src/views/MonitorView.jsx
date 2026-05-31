@@ -5,7 +5,7 @@ import { Howl } from 'howler';
 
 import { createMonitorEngine } from '../engine/MonitorEngine'; 
 import waitImage from '../assets/wait_monitor.jpg';
-import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION, SERVER_IP } from '../config/constants';
+import { STANDBY_WIND_FREQUENCY, STANDBY_WIND_SCALE_VALUES, STANDBY_WIND_DURATION, SERVER_IP, AUDIO_POOL } from '../config/constants';
 
 /**
  * 展場大螢幕視圖 (Monitor View)
@@ -25,36 +25,29 @@ export default function MonitorView() {
     socketRef.current = io(SERVER_IP);
     
     // ==========================================
-    // 🎵 初始化三種層次的水滴音效 (Howler.js)
+    // 🎵 動態初始化隨機音效池 (Howler.js)
     // ==========================================
-    const dropSmallSound = new Howl({ 
-      src: ['/audio/drop_small.mp3'], 
-      html5: false, 
-      volume: 0.5 // 小水滴降低音量，製造細碎感
-    });
-
-    const dropMidSound = new Howl({ 
-      src: ['/audio/drop_mid.mp3'], 
-      html5: false, 
-      volume: 0.8 // 中水滴標準音量
-    });
-
-    const dropLargeSound = new Howl({ 
-      src: ['/audio/drop_large.mp3'], 
-      html5: false, 
-      volume: 1.0 // 大水滴全音量輸出，保留重低音共鳴
+    const soundInstances = {};
+    
+    // 🌟 根據 constants.js 的陣列，自動載入所有音檔
+    AUDIO_POOL.forEach(fileName => {
+      soundInstances[fileName] = new Howl({ 
+        src: [`/audio/${fileName}`], 
+        html5: false, 
+        volume: 0.8 // 統一設定展場預設音量
+      });
     });
 
     // 🎵 監聽平板傳來的播放訊號
-    socketRef.current.on('monitor-play-sound', (soundType) => {
-      if (soundType === 'drop_small') dropSmallSound.play();
-      else if (soundType === 'drop_mid') dropMidSound.play();
-      else if (soundType === 'drop_large') dropLargeSound.play();
+    socketRef.current.on('monitor-play-sound', (soundFileName) => {
+      if (soundInstances[soundFileName]) {
+        soundInstances[soundFileName].play();
+      }
     });
 
-    socketRef.current.on('monitor-start-crying', (selectedWords) => {
+    socketRef.current.on('monitor-start-crying', (words) => {
       if (engineRef.current) {
-        engineRef.current.triggerCrying(selectedWords);
+        engineRef.current.triggerCrying(words);
       }
     });
 

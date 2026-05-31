@@ -16,7 +16,8 @@ import {
   DELAY_BEFORE_GEM_REVEAL,
   GEM_REVEAL_DURATION,
   DELAY_BEFORE_SETTLEMENT,
-  GEM_FADE_OUT_DURATION
+  GEM_FADE_OUT_DURATION,
+  AUDIO_POOL
 } from '../config/constants';
 
 /**
@@ -202,7 +203,7 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     }
 
     // ==========================================
-    // 🌟 2. 動態判斷水波大小與發送對應音效
+    // 🌟 2. 動態判斷水波大小與發送隨機音效
     // ==========================================
     const randomScale = RIPPLE_BASE_SCALE + Math.random() * RIPPLE_RANDOM_SCALE;
 
@@ -210,18 +211,10 @@ export function setupTablet(app, onSettlement, onPlaySound) {
     rippleHistory.push({ x: finalX, y, scale: randomScale, word: char });
     console.log(`🧠 [記憶系統] 已記錄落點: (${finalX.toFixed(1)}, ${y.toFixed(1)})，字詞: ${char}，累計: ${rippleHistory.length}`);
 
-    const tierSize = RIPPLE_RANDOM_SCALE / 3;
-    const thresholdSmall = RIPPLE_BASE_SCALE + tierSize;       
-    const thresholdMid = RIPPLE_BASE_SCALE + (tierSize * 2);   
-
+    // 🌟 修改：直接從常數音效池中隨機抽取一個檔案名稱，並發送給大螢幕
     if (onPlaySound) {
-      if (randomScale < thresholdSmall) {
-        onPlaySound('drop_small');
-      } else if (randomScale < thresholdMid) {
-        onPlaySound('drop_mid');
-      } else {
-        onPlaySound('drop_large');
-      }
+      const randomSound = AUDIO_POOL[Math.floor(Math.random() * AUDIO_POOL.length)];
+      onPlaySound(randomSound);
     }
 
     // 🌟 寫入活躍清單 (將 finalX 與 y 一併存入，供下一個水波紋計算空間使用)
