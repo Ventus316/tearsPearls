@@ -3,7 +3,7 @@
 // ==========================================
 // 🔌 網路通訊設定 (Network & Socket Settings)
 // ==========================================
-export const SERVER_IP = 'http://192.168.0.203:3000';
+export const SERVER_IP = 'http://192.168.0.101:3000';
 
 // ==========================================
 // 📝 基礎字詞庫 (Vocabulary Base)
@@ -79,11 +79,11 @@ export const GEM_MAPPING = {
 // 數值代表「轉完整整一圈所需花費的秒數」(數值越大轉越慢)
 // ==========================================
 export const GEM_ROTATION_SPEEDS = {
-  pearl: 2.0,    // 珍珠
+  pearl: 3.0,    // 珍珠
   diamond: 4.0,  // 鑽石
-  crystal: 2.0,  // 白水晶
-  opal: 2.0,     // 蛋白石
-  lapis: 2.0     // 青金石
+  crystal: 3.0,  // 白水晶
+  opal: 3.0,     // 蛋白石
+  lapis: 3.0     // 青金石
 };
 
 // ==========================================
@@ -106,7 +106,7 @@ export const RIPPLE_RANDOM_SCALE = 0.15;   // 水波紋文字的隨機放大變�
 // 🌬️ 顯示器待機畫面呼吸特效 (Monitor Standby Displacement Settings)
 // ==========================================
 export const STANDBY_WIND_FREQUENCY = "0.005 0.008"; // 波動頻率 (數值越小，波浪越寬廣柔軟)
-export const STANDBY_WIND_SCALE_VALUES = "5; 150; 5"; // 波動強度變化 (最小值; 最大值; 最小值)
+export const STANDBY_WIND_SCALE_VALUES = "0; 70; 5"; // 波動強度變化 (最小值; 最大值; 最小值)
 export const STANDBY_WIND_DURATION = "20s";          // 一次呼吸循環的時間
 
 // ==========================================
@@ -123,7 +123,7 @@ export const DELAY_BEFORE_GEM_REVEAL = 250;
 // 呼吸間隔：粒子全數吸入後，等待寶石開始顯影的時間 (毫秒)
 export const GEM_REVEAL_DURATION = 2500;    
 // 顯影時間：寶石從無到完全顯影放大的總時間 (毫秒)
-export const DELAY_BEFORE_SETTLEMENT = 2500; 
+export const DELAY_BEFORE_SETTLEMENT = 4000; 
 // 結算停留：寶石顯影完畢後，停留多久才進入結算 (毫秒)
 export const GEM_FADE_OUT_DURATION = 1000;   
 // 淡出時間：寶石與畫面變暗的過渡時間 (毫秒)
