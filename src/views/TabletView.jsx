@@ -190,10 +190,12 @@ export default function TabletView() {
   };
 
   return (
+    /* 待機畫面 */
     <div 
       className="w-screen h-screen overflow-hidden bg-[#050507] text-[#E8E4D9] select-none relative"
       onPointerDown={handleGlobalInteraction}
     >
+      {/* 待機影片層 */}
       <video
         src={waitVideo}
         autoPlay
@@ -204,6 +206,17 @@ export default function TabletView() {
           interactionState === 'standby' ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
+
+      {/* 🌟 新增：透明提示文字圖層 */}
+      <div 
+        className={`absolute inset-0 z-[51] flex items-center justify-center pointer-events-none transition-opacity duration-1000 ${
+          interactionState === 'standby' ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <p className="text-black/50 text-[25px] font-light tracking-[0.4em] animate-pulse drop-shadow-md">
+          輕觸畫面開始互動
+        </p>
+      </div>
 
       <div ref={pixiContainer} className="absolute inset-0 z-0" />
 
