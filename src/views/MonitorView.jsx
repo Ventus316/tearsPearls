@@ -83,10 +83,17 @@ export default function MonitorView() {
       const modelBase = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
       const visionModule = await import(/* @vite-ignore */ mpBase + '/vision_bundle.mjs');
       const vision = await visionModule.FilesetResolver.forVisionTasks(mpBase + '/wasm');
+      
+      // ==========================================
+      // 🌟 階段 1 & 2：AI 模型抗遮擋與多人設定
+      // ==========================================
       const faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, { 
         baseOptions: { modelAssetPath: modelBase, delegate: "GPU" }, 
         runningMode: "VIDEO", 
-        numFaces: 1 
+        numFaces: 5,                       // 👁️ 允許偵測最多 5 人
+        minFaceDetectionConfidence: 0.4,   // 😷 降低信心門檻，容忍口罩與帽子 (預設為 0.5)
+        minFacePresenceConfidence: 0.4,    // 🕶️ 降低追蹤門檻，容忍粗框眼鏡
+        minTrackingConfidence: 0.4
       });
       
       if (!engineRef.current && socketRef.current) {
@@ -110,11 +117,27 @@ export default function MonitorView() {
         const results = faceLandmarker.detectForVideo(videoRef.current, performance.now());
         
         if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-          const marks = results.faceLandmarks[0];
           const vw = videoRef.current.videoWidth; 
           const vh = videoRef.current.videoHeight;
           const sw = window.innerWidth; 
           const sh = window.innerHeight;
+          
+          // ==========================================
+          // 🌟 階段 1：過濾出「距離最近（臉部面積最大）」的人
+          // ==========================================
+          let closestFaceIndex = 0;
+          let maxFaceWidth = 0;
+
+          results.faceLandmarks.forEach((marks, index) => {
+            // 利用左右臉頰極端點 (234 與 454) 來計算臉部在畫面中的寬度
+            const faceWidth = Math.abs(marks[454].x - marks[234].x);
+            if (faceWidth > maxFaceWidth) {
+              maxFaceWidth = faceWidth;
+              closestFaceIndex = index;
+            }
+          });
+
+          const marks = results.faceLandmarks[closestFaceIndex]; // 只取最大那張臉
           
           const scale = Math.max(sw / vw, sh / vh); 
           const mapPoint = (mark) => ({
@@ -122,16 +145,28 @@ export default function MonitorView() {
              y: (sh / 2) + ((mark.y * vh - vh/2) * scale)
           });
           
-          eyeCoordsRef.current = { 
-            leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])), 
-            rightLowerEdge: rightLowerIndices.map(idx => mapPoint(marks[idx])),
-            leftOuter: mapPoint(marks[33]), 
-            leftInner: mapPoint(marks[133]), 
-            rightInner: mapPoint(marks[362]), 
-            rightOuter: mapPoint(marks[263]) 
-          };
+          // ==========================================
+          // 🌟 階段 3：異常座標防護 (Fixing the Fallback)
+          // ==========================================
+          // 隨機抽驗一顆眼睛 (145點位) 的 Y 座標，檢查 AI 是否因為墨鏡而算出垃圾數值
+          const testEyePoint = mapPoint(marks[145]);
+
+          // 如果眼睛的 Y 軸跑到畫面上方 ( < -50 ) 或根本不在畫布合理範圍，強制丟棄此數據
+          if (testEyePoint.y < -50 || testEyePoint.y > sh + 50 || isNaN(testEyePoint.y)) {
+            eyeCoordsRef.current = null; // 丟棄錯誤座標，觸發引擎端 Fallback
+          } else {
+            // 數據正常，正式寫入
+            eyeCoordsRef.current = { 
+              leftLowerEdge: leftLowerIndices.map(idx => mapPoint(marks[idx])), 
+              rightLowerEdge: rightLowerIndices.map(idx => mapPoint(marks[idx])),
+              leftOuter: mapPoint(marks[33]), 
+              leftInner: mapPoint(marks[133]), 
+              rightInner: mapPoint(marks[362]), 
+              rightOuter: mapPoint(marks[263]) 
+            };
+          }
         } else { 
-          eyeCoordsRef.current = null; 
+          eyeCoordsRef.current = null; // 無人臉，觸發引擎端 Fallback
         }
       }
       requestAnimationFrame(loop);
