@@ -254,12 +254,12 @@ export default function TabletView() {
 
           {/* 結算畫面層 */}
           {interactionState === 'finished' && (
-            <div className="flex h-full w-full items-center justify-center px-6 z-20 animate-in fade-in duration-1000">
-              <div className="flex w-[min(100%,520px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-8 shadow-2xl backdrop-blur-2xl">
-                <p className="w-full text-center text-xs font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
+            <div className="flex h-full w-full items-center justify-center px-4 z-20 animate-in fade-in duration-1000">
+              <div className="flex w-[min(100%,600px)] flex-col items-center rounded-[32px] border border-white/10 bg-[#1c1c1e]/80 px-8 py-10 shadow-2xl backdrop-blur-2xl">
+                <p className="w-full text-center text-[20px] font-light tracking-[0.2em] text-white/40">情緒已結晶</p>
                 <div className="mb-4 mt-3 h-[2px] w-full bg-white/20" />
                 
-                <p className="px-4 py-2 text-center text-[15px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90 whitespace-pre-line">
+                <p className="px-4 py-2 text-center text-[18px] font-light leading-relaxed tracking-[0.15em] text-amber-50/90 whitespace-pre-line">
                   {getSettlementText()}
                 </p>
                 

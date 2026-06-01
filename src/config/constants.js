@@ -3,7 +3,7 @@
 // ==========================================
 // 🔌 網路通訊設定 (Network & Socket Settings)
 // ==========================================
-export const SERVER_IP = 'http://192.168.0.101:3000';
+export const SERVER_IP = 'http://140.138.53.98:3000';
 
 // ==========================================
 // 📝 基礎字詞庫 (Vocabulary Base)
@@ -90,7 +90,7 @@ export const GEM_ROTATION_SPEEDS = {
 // 💎 寶石視覺與物理設定 (Gem Visual & Physics Settings)
 // ==========================================
 export const GEM_INITIAL_SCALE = 0.04;    // 寶石剛出場時的極小初始尺寸 (Scale)
-export const GEM_FINAL_SCALE = 0.24;      // 寶石動畫結束後的最終尺寸 (原本為 0.04 + 0.2)
+export const GEM_FINAL_SCALE = 0.85;      // 寶石動畫結束後的最終尺寸
 
 export const GEM_MASK_WIDTH = 600;        // 寶石顯影遮罩的寬度 (需大於寶石最大尺寸)
 export const GEM_MASK_HEIGHT = 600;       // 寶石顯影遮罩的高度
